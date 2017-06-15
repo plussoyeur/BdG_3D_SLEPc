@@ -1,0 +1,51 @@
+//===============================================================
+// main macros defining the problem 
+//===============================================================
+
+// macro for u2
+
+macro un2(u) (real(u*conj(u)))//
+
+// macro for \int |u|^2= 
+
+macro intu2(Th,u) (int3d(Th)(un2(u)))//
+
+macro density(Th,u) (int3d(Th)(un2(u)))//
+
+// macro for  the L2 scalar product
+
+macro scal2uv(Th,u,v) (2*int3d(Th)(real(u*conj(v))))//
+
+// macro for vector potential operator (AG)
+
+macro   lzd(u) (y*dx(u)-x*dy(u))//
+
+// macro for the angular momentum -- integral
+
+macro   Lzi(Th,u,uconj) (-int3d(Th)(imag(uconj*lzd(u))))//
+   
+//macro to compute gradu*gradv
+
+macro graduv(u,v) (dx(u)*dx(v)+dy(u)*dy(v)+dz(u)*dz(v))//
+
+// macro for the energy 
+
+macro energ(Th,u,uconj)        ep*( int3d(Th)(0.5*real(dx(u)*dx(uconj)+dy(u)*dy(uconj)+dz(u)*dz(uconj)))
+                               +int3d(Th)(Ctrap*un2(u))
+                               +int3d(Th)(0.5*Cg*un2(u)*un2(u))
+			       -Comega*Lzi(Th,u,uconj))//
+
+
+
+
+// macro for the energychemical potential 
+
+macro chempot(Th,u,uconj)     ep*( int3d(Th)(0.5*real(dx(u)*dx(uconj)+dy(u)*dy(uconj)+dz(u)*dz(uconj)))
+                               +int3d(Th)(Ctrap*un2(u))
+                               +int3d(Th)(Cg*un2(u)*un2(u))
+			       -Comega*Lzi(Th,u,uconj))//
+  
+
+// macro for smooting the solution
+
+macro fsmooth(rr,Rsmooth) (0.5*(1+tanh(25*(1-rr/Rsmooth))))//

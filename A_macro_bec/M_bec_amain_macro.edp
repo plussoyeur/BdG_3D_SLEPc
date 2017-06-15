@@ -1,0 +1,111 @@
+//===============================================================
+// BEC 2D
+// main macros defining the problem 
+//===============================================================
+
+// macro for u2
+
+macro un2(u) (real(u*conj(u)))//
+
+// macro for \int |u|^2= 
+
+  macro intu2(Th,u) (int2d(Th)(un2(u)))//
+
+  macro density(Th,u) (int2d(Th)(un2(u)))//
+  macro density1(Th,u) (int1d(Th,1)(un2(u)))//
+
+
+// macro for  the L2 scalar product
+
+/* macro scal2uv(Th,u,v) (int2d(Th)(real(u*conj(v)+conj(u)*v)))// */
+
+macro scal2uv(Th,u,v) (2*int2d(Th)(real(u*conj(v))))//
+
+// macro for vector potential operator (AG)
+
+macro   lzd(u) (y*dx(u)-x*dy(u))//
+
+// macro for the angular momentum -- integral
+
+macro   Lzi(Th,u,uconj) (-int2d(Th)(imag(uconj*lzd(u))))//
+
+  macro   Lzi2C(Th,u1,u1conj,u2,u2conj) (-int2d(Th)(imag(u1conj*lzd(u1))) -int2d(Th)(imag(u2conj*lzd(u2))))//
+
+
+// macro for the energy 
+
+macro energ(Th,u,uconj)     ep*( int2d(Th)(0.5*real(dx(u)*dx(uconj)+dy(u)*dy(uconj)))
+                               +int2d(Th)(Ctrap*un2(u))
+                               +int2d(Th)(0.5*Cg*un2(u)*un2(u))
+			       -Comega*Lzi(Th,u,uconj))//
+
+
+  macro energ1(Th,u,uconj)     ep*( int1d(Th,1)(0.5*real(dx(u)*dx(uconj)))
+				    +int1d(Th,1)(Ctrap*un2(u))
+				    +int1d(Th,1)(0.5*Cg*un2(u)*un2(u))
+			       -Comega*Lzi(Th,u,uconj))//
+
+  macro energ2C(Th,u1,u1conj,u2,u2conj) ep*(
+					    int2d(Th)(0.5*real(dx(u1)*dx(u1conj) + dy(u1)*dy(u1conj)))
+					   +int2d(Th)(0.5*real(dx(u2)*dx(u2conj) + dy(u2)*dy(u2conj)))
+				    +int2d(Th)(Ctrap*un2(u1))
+				    +int2d(Th)(Ctrap*un2(u2))
+				    +int2d(Th)(0.5*(beta11*un2(u1)+beta12*un2(u2))*un2(u1))
+				    +int2d(Th)(0.5*(beta21*un2(u1)+beta22*un2(u2))*un2(u2))
+	           		    -Comega*Lzi(Th,u1,u1conj)
+                                    -Comega*Lzi(Th,u2,u2conj))//
+  
+  macro energ2C1(Th,u1,u1conj,u2,u2conj) ep*(
+				     int1d(Th,1)(0.5*real(dx(u1)*dx(u1conj)))
+				    +int1d(Th,1)(0.5*real(dx(u2)*dx(u2conj)))
+				    +int1d(Th,1)(Ctrap*un2(u1))
+				    +int1d(Th,1)(Ctrap*un2(u2))
+				    +int1d(Th,1)(0.5*(beta11*un2(u1)+beta12*un2(u2))*un2(u1))
+				    +int1d(Th,1)(0.5*(beta21*un2(u1)+beta22*un2(u2))*un2(u2))
+	           		    -Comega*Lzi(Th,u1,u1conj)
+                                    -Comega*Lzi(Th,u2,u2conj))//
+
+
+// macro for the energychemical potential 
+
+macro chempot(Th,u,uconj)     ep*( int2d(Th)(0.5*real(dx(u)*dx(uconj)+dy(u)*dy(uconj)))
+                               +int2d(Th)(Ctrap*un2(u))
+                               +int2d(Th)(Cg*un2(u)*un2(u))
+			       -Comega*Lzi(Th,u,uconj))//
+  
+  macro chempot1(Th,u,uconj)     ep*( int1d(Th,1)(0.5*real(dx(u)*dx(uconj)))
+				      +int1d(Th,1)(Ctrap*un2(u))
+				      +int1d(Th,1)(Cg*un2(u)*un2(u))
+			       -Comega*Lzi(Th,u,uconj))//
+  
+  macro chempot2C1(Th,u1,u1conj,u2,u2conj)
+                                 ep*( int2d(Th)(0.5*real(dx(u1)*dx(u1conj) + dy(u1)*dy(u1conj)))
+				      +int2d(Th)(Ctrap*un2(u1))
+				      +int2d(Th)((beta11*un2(u1)+beta12*un2(u2))*un2(u1))
+			              -Comega*Lzi(Th,u1,u1conj))//
+
+   macro chempot2C2(Th,u1,u1conj,u2,u2conj)
+                                 ep*( int2d(Th)(0.5*real(dx(u2)*dx(u2conj) + dy(u2)*dy(u2conj)))
+				      +int2d(Th)(Ctrap*un2(u2))
+				      +int2d(Th)((beta22*un2(u2)+beta21*un2(u1))*un2(u2))
+			              -Comega*Lzi(Th,u2,u2conj))//
+
+  
+  macro chempot2C1d1(Th,u1,u1conj,u2,u2conj)
+                                 ep*( int1d(Th,1)(0.5*real(dx(u1)*dx(u1conj)))
+				      +int1d(Th,1)(Ctrap*un2(u1))
+				      +int1d(Th,1)((beta11*un2(u1)+beta12*un2(u2))*un2(u1))
+			              -Comega*Lzi(Th,u1,u1conj))//
+
+   macro chempot2C1d2(Th,u1,u1conj,u2,u2conj)
+                                 ep*( int1d(Th,1)(0.5*real(dx(u2)*dx(u2conj)))
+				      +int1d(Th,1)(Ctrap*un2(u2))
+				      +int1d(Th,1)((beta22*un2(u2)+beta21*un2(u1))*un2(u2))
+			              -Comega*Lzi(Th,u2,u2conj))//
+
+
+
+  
+// macro for smooting the solution
+
+macro fsmooth(rr,Rsmooth) (0.5*(1+tanh(25*(1-rr/Rsmooth))))//

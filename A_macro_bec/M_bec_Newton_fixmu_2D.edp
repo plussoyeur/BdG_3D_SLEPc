@@ -1,0 +1,38 @@
+/*  valid for 1D and 2D  cases */
+macro  Newtonfixmu2d(iter,EPS0,ITERMAX,ipass)
+{
+iter=0; 
+epsiter=10;
+
+Vhvec [aN,bN],[v1n,v2n];
+
+ problem  aNewton([aN,bN],[v1n,v2n], solver=UMFPACK)=
+                     int2d(Th)(0.5*(dx(aN)*dx(v1n) + dy(aN)*dy(v1n)) + (Ctrap+ Cg*(3*unr^2+   uni^2) - mu)*aN*v1n)
+                    +int2d(Th)(0.5*(dx(bN)*dx(v2n) + dy(bN)*dy(v2n)) + (Ctrap+ Cg*(  unr^2+ 3*uni^2) - mu)*bN*v2n)
+                    +int2d(Th)(2*Cg*unr*uni*(bN*v1n + aN*v2n))
+                    -int2d(Th,qforder=qforder)(0.5*(dx(unr)*dx(v1n) + dy(unr)*dy(v1n)) + (Ctrap+Cg*(unr^2+ uni^2) - mu)*unr*v1n)
+                    -int2d(Th,qforder=qforder)(0.5*(dx(uni)*dx(v2n) + dy(uni)*dy(v2n)) + (Ctrap+Cg*(unr^2+ uni^2) - mu)*uni*v2n)
+                    + on(2,4,aN=0) +  on(2,4,bN=0) ; /* compatibility for 1D and 2D */
+
+                   
+  while(epsiter > EPS0 && iter < ITERMAX)
+ {
+  
+  iter++; 
+
+      aNewton;
+           
+      unr = unr - aN;    
+      uni = uni - bN;
+
+      epsiter= aN[].linfty;
+	    
+	  
+     cout << "Newton iter="<<iter<<" epsiter = " << epsiter <<endl;
+     fout << "Newton iter="<<iter<<" epsiter = " << epsiter <<endl;
+
+                                                      
+ } /* end Newton loop*/
+
+}
+//EOM

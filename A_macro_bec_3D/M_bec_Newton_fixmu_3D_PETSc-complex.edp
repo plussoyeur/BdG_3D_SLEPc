@@ -1,0 +1,65 @@
+/*  valid for 3D  cases */
+NewMacro  Newtonfixmu3d(iter,EPS0,ITERMAX,ipass)
+{
+  real cputime = mpiWtime(), cputime0;
+iter=0; 
+epsiter=10;
+ unrc[].re = unr[];
+ unic[].re = uni[];
+
+ Vhvec<complex> [aN,bN],[v1n,v2n],[s1N,s2N];
+ 
+ varf aNewton([aN,bN],[v1n,v2n]) =
+   int3d(Th)(0.5*(dx(aN)*dx(v1n) + dy(aN)*dy(v1n) + dz(aN)*dz(v1n)) + (Ctrap+ Cg*(3*unr^2+   uni^2) - mu)*aN*v1n) +
+   int3d(Th)(0.5*(dx(bN)*dx(v2n) + dy(bN)*dy(v2n) + dz(bN)*dz(v2n)) + (Ctrap+ Cg*(  unr^2+ 3*uni^2) - mu)*bN*v2n) +
+   int3d(Th)(2*Cg*unr*uni*(bN*v1n + aN*v2n)) +
+   on(0,aN=0) +
+   on(0,bN=0);
+
+ varf bNewton([aN,bN],[v1n,v2n]) =
+    int3d(Th,qforder=qforder)(0.5*(dx(unr)*dx(v1n) + dy(unr)*dy(v1n) + dz(unr)*dz(v1n)) + (Ctrap+Cg*(unr^2+ uni^2) - mu)*unr*v1n)
+  + int3d(Th,qforder=qforder)(0.5*(dx(uni)*dx(v2n) + dy(uni)*dy(v2n) + dz(uni)*dz(v2n)) + (Ctrap+Cg*(unr^2+ uni^2) - mu)*uni*v2n);
+
+  matrix<complex> aNewt = aNewton(Vhvec,Vhvec);
+ dmatrix<complex> A(aNewt, arrayIntersection, restrictionIntersection, D);
+
+   while(epsiter > EPS0 && iter < ITERMAX)
+    {
+  iter++;
+
+  
+    if(iter > 1) {
+      aNewt = aNewton(Vhvec,Vhvec);
+      changeOperator(A, aNewt);
+    }
+    
+    set(A, sparams = "-ksp_pc_side left -pc_type bjacobi -sub_pc_type cholesky -sub_pc_factor_mat_solver_package mumps");
+    
+      s1N[] = bNewton(0,Vhvec);
+
+      aN[] = A^-1 * s1N[];
+      
+      
+      unrc = unrc - aN;    
+      unic = unic - bN;
+
+      unr= real(unrc);
+      uni = real(unic);
+      
+      real epsiterLoc = aN[].linfty;
+      mpiAllReduce(epsiterLoc, epsiter, mpiCommWorld, mpiMAX);
+       
+      un = unr + li*uni;
+     
+
+      if(mpirank == 0) cout << "Newton iter="<<iter<<" epsiter = " << epsiter <<endl;
+      if(mpirank == 0) fout << "Newton iter="<<iter<<" epsiter = " << epsiter <<endl;
+
+                                                    
+ } /* end Newton loop*/
+  cputime = mpiWtime()-cputime;
+  mpiReduce(cputime,cputime0,processor(0),mpiMAX);
+  if(mpirank == 0) cout <<"CPU time for Newton : " << cputime0 << endl;
+  if(mpirank == 0) fout <<"CPU time for Newton : " << cputime0 << endl;
+}
+//EndMacro

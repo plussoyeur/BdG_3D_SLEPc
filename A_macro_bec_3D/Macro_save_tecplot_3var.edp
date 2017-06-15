@@ -1,0 +1,33 @@
+//===============================================================
+// save data file for Tecplot 
+// contains the mesh Th
+// and the values of 3 variables v1,v2,v3
+//===============================================================
+
+macro  savetecplot3(Th,Vh,namef,v1in,v2in,v3in,cv1,cv2,cv3,zname)
+{
+{    fespace Vh1loc(Th,P1);
+      Vh1loc  Thx=x, Thy=y, Thz =z;
+      Vh1loc v1 = v1in;
+      Vh1loc v2 = v2in;
+      Vh1loc v3 = v3in;
+
+   ofstream ftec(namef);
+      ftec<<"VARIABLES= x y z "<<cv1<<" "<<cv2<<" "<<cv3<<endl;
+      ftec<<"ZONE T=\""<<zname<<"\", N="<<Th.nv<<", E="<<Th.nt<<", DATAPACKING=POINT, ZONETYPE=FETETRAHEDRON"<<endl;
+
+      for(int i=0;i<Th.nv;i++)
+        ftec<< Thx[][i] << "   "<< Thy[][i] << "   "<< Thz[][i]
+            <<"   " <<v1[][i]
+            <<"   " <<v2[][i]
+            <<"   " <<v3[][i]
+            <<endl;
+
+      ftec<<endl;
+      /* connectivites */
+      for(int i=0;i<Th.nt;i++)
+        ftec<< Th[i][0]+1 << "   "<< Th[i][1]+1<<"   " <<Th[i][2]+1<<"   " <<Th[i][3]+1<<endl;
+
+cout<<" +++++++++ savetec3var  :: fichier "<<namef<<endl;
+}
+}// EOM

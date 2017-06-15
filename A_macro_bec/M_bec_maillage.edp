@@ -1,0 +1,36 @@
+//===============================================================
+// builds the mesh for BEC simulations
+// three types of possible meshes
+//  (1) circle of radius Rdom = ARdom*Rmax (most common)
+//  (2) circle_Rdom + circle_Rmax (sets a buffer zone after TF)
+//  (3) circle_Rin  + circle_Rdom (for giant vortices)
+//===============================================================
+
+macro  meshBEC2D(Th,imtype,nbseg,Rin,Rmax,Rdom)
+{
+   border cRin(t=0,2*pi){label=0;x=Rin*cos(t);y=Rin*sin(t);};
+   border cRout(t=0,2*pi){label=0;x=Rmax*cos(t);y=Rmax*sin(t);};
+   border cclip(t=0,2*pi){label=1;x=Rdom*cos(t);y=Rdom*sin(t);};
+  
+   if(imtype==3 && Rin > 1.e-3)
+     {
+       cout <<"============  Mesh built with (Rin, Rmax, Rdom)";
+       fout <<"============  Mesh built with (Rin, Rmax, Rdom)";
+       Th=buildmesh(cclip(nbseg)+cRout(nbseg*aRdom)+cRin(nbseg*Rin/Rmax));
+     }
+   else if(imtype == 2)
+     {
+       cout <<"============  Mesh built with (Rmax, Rdom)"<<endl;
+       fout <<"============  Mesh built with (Rmax, Rdom)"<<endl;
+       Th=buildmesh(cclip(nbseg)+cRout(nbseg*aRdom));
+     }
+   else
+     {
+       cout <<"============  Mesh built with (Rdom)"<<endl;
+       fout <<"============  Mesh built with (Rdom)"<<endl;
+       Th=buildmesh(cclip(nbseg));
+     } 
+cout<<"==========================================="<<endl;
+fout<<"==========================================="<<endl;
+
+}// EOM

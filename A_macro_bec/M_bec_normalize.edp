@@ -1,0 +1,24 @@
+//===============================================================
+// normalize the complex solution
+// tout = message to print
+// fout = file to print
+//===============================================================
+
+macro  BECnormalize(Th,un,Normu,ur,ui,umod,tout,fout)
+{
+   Normu = int2d(Th)(real(un*conj(un)));
+   cout << "=========== "<< tout << " :: Norm before normalization (1) =" << Normu <<endl;
+   fout << "=========== "<< tout << " :: Norm before normalization (1) =" << Normu <<endl;
+   
+   un    = un/sqrt(Normu);
+
+   Normu = int2d(Th)(real(un*conj(un)));
+   cout << "=========== "<< tout << " :: Norm after  normalization (2) =" << Normu <<endl;
+   fout << "=========== "<< tout << " :: Norm after  normalization (2) =" << Normu <<endl;
+
+   uconj = conj(un);
+   ur    = real(un);
+   ui    = imag(un);
+   umod  = sqrt(real(un*uconj));
+
+}// EOM

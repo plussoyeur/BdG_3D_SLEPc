@@ -1,0 +1,76 @@
+{
+
+  if(mpirank ==0){
+    cout << "===============================" << endl;
+    cout << "========== Begin Bdg ==========" << endl;
+    cout << "===============================" << endl;
+    fout << "===============================" << endl;
+    fout << "========== Begin Bdg ==========" << endl;
+    fout << "===============================" << endl;
+  }
+
+  real cputime = mpiWtime(), cputime0=0;
+  
+  // Parameters
+  complex[int]        EigenVAL(0); //array to store eigenvalues
+  Vhvec<complex>[int] [eV1,eV2](nev); //array to store eigenvectors
+  eV1[0][] = 0.0; //Don't forget to initialise eigenvectors
+
+
+  // bilinear and linear forms
+  varf aV([aB,bB],[v1,v2])=
+    int3d(Th)( 0.5*(dx(aB)*dx(v1) + dy(aB)*dy(v1) + dz(aB)*dz(v1)) + CtrapLoc*aB*v1 + 2*Cg*un2(un)*aB*v1 - mu*aB*v1)
+    +int3d(Th)(-0.5*(dx(bB)*dx(v2) + dy(bB)*dy(v2) + dz(bB)*dz(v2)) - CtrapLoc*bB*v2 - 2*Cg*un2(un)*bB*v2 + mu*bB*v2)
+    +int3d(Th)(Cg*un*un*bB*v1 - Cg*conj(un)*conj(un)*aB*v2) 
+    +on(0,aB=0) +  on(0,bB=0) ;  // Boundary condition
+  
+  varf bV([aB,bB],[v1,v2]) = int3d(Th)(aB*v1+bB*v2); // no  Boundary condition
+
+
+
+  // matrices
+  matrix<complex> A= aV(Vhvec,Vhvec);
+  matrix<complex> B= bV(Vhvec,Vhvec);
+
+  dmatrix<complex> DistA(A, arrayIntersection, restrictionIntersection, D, clean = true);
+  dmatrix<complex> DistB(DistA, B, clean = true);
+
+  // Parameters for the distributed EigenValue solver
+  string ssparams =            
+    " -eps_nev " + nev       + // Number of eigenvalues
+    " -eps_type krylovschur" + // Method for the solver
+    " -st_type sinvert "     +
+    " -eps_target 0.01"      + // shift
+    " -st_pc_type lu "       + // factorisation
+    " -st_pc_factor_mat_solver_package mumps" +
+    " -eps_view"             +
+    " -eps_pos_gen_non_hermitian" // The problem is symmetric (B) but non hermitian
+  ;
+
+  // Solving generalized egeinvalue problem
+  int k = zeigensolver
+    (DistA,              // matrix OP = A − sigma*B with sigma eps_target
+     DistB,              //
+     vectors = eV1, // Array to store the FEM-EigenFunctions
+     values  = EigenVAL, // Array to store the EigenValues
+     sparams = ssparams  // Parameters for the distributed EigenValue solver
+     );
+  
+  k = min(k,nev); // some time the number of converged eigen value can be greater than nev;
+
+  cputime = mpiWtime()-cputime;
+  mpiReduce(cputime,cputime0,processor(0),mpiMAX);
+  if(mpirank == 0) cout <<"CPU time for SLEPc : " << cputime0 << endl;
+  if(mpirank == 0) fout <<"CPU time for SLEPc : " << cputime0 << endl;
+  
+  // Display eigenvalues
+  for(int i=0;i<k;i++){
+    if(!mpirank) {
+      complex egval = EigenVAL[i];
+      cout << " Eigenvalue #"+i+" = "+egval<<endl;
+      fout << " Eigenvalue #"+i+" = "+egval<<endl;
+      fvalp <<  egval  <<endl;
+    }
+  }
+
+}

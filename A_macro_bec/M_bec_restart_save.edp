@@ -1,0 +1,17 @@
+//===============================================================
+// save solution for restart 
+//===============================================================
+
+macro  restartsave(u,namef,niter)
+{
+{   
+      ofstream ftec(namef);
+      ftec.precision(16);
+      ftec<<niter<<endl;
+      ftec<< u[];
+      
+
+cout<<" +++++++++ save_restart_file  :: fichier "<<namef<<endl;
+fout<<" +++++++++ save_restart_file  :: fichier "<<namef<<endl;
+}
+}// EOM

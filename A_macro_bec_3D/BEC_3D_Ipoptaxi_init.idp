@@ -1,0 +1,159 @@
+//======================================================
+//Use Ipopt to build the initial axisymetric approximation in 2D
+//======================================================
+
+//======================================================
+//Parameters for the equation
+//======================================================
+
+func Vbarax = ( (x*x)*max(ax,ay) + (y*y)*(az) + square(x*x)*a4 );//trapping potential
+func Vbaraxeff = Vbarax - 0.5*Comega*Comega*x*x;//effective trapping potential
+func Ctrapax =0.5*Vbarax/(ep*ep);
+
+//======================================================
+//Parameters for the loop and Ipopt
+//======================================================
+
+real tolax = 1e-8;
+int nbopt = 500;
+int maxiter = 100;
+
+//======================================================
+//1D Mesh definition
+//======================================================
+
+mesh Thax=square(2*nbseg,2*nbseg,[Rdom*x,Rzdom*y]);
+
+//======================================================
+//Initial condition with Thomas_Fermi
+//======================================================
+
+func rhoTFax = max(0.,  (mu - Vbaraxeff)/(2.*ep*ep*Cg));
+
+//======================================================
+//FE Space
+//======================================================
+
+fespace Vhax(Thax,FEchoice);
+
+//======================================================
+// Definition of the functions we need with Ipopt
+//======================================================
+
+Vhax ur, vr;
+macro Grad(u) [dx(u),dy(u)]//EOM
+
+matrix GPm;
+matrix dGPm;
+matrix NWFm;
+
+varf GPvf(vr,ur) = 
+	int2d(Thax)(4.*pi*x*(  0.5*Grad(ur)'*Grad(vr) + (Ctrapax + 0.5*square(mod/x)- Comega*mod - mu)*(ur*vr) ) ) ;
+varf dGPvf(vr,ur) = 
+	int2d(Thax)(4.*pi*x*(  Grad(ur)'*Grad(vr) + 2*(Ctrapax + 0.5*square(mod/x)- Comega*mod - mu)*(ur*vr) ) ) ;
+varf NWFvf(vr,ur) = int2d(Thax)(4.*pi*x*(vr*ur));
+
+GPm = GPvf(Vhax,Vhax);
+dGPm = dGPvf(Vhax,Vhax);
+NWFm = NWFvf(Vhax,Vhax);
+
+
+func real Egp(real[int] &X)
+{ 
+	Vhax ar;
+	ar[] = X;
+	real[int] MV = GPm*X;
+	real Ebili = X'*MV;
+	real E = Ebili + int2d(Thax)(4.*pi*x*(0.5*Cg*(ar^2.)^2.));
+	return E;
+}
+
+func real[int] dEgp(real[int] &X)
+{
+	Vhax ar;
+	ar[] = X;
+	varf vdj(vr,ur) = int2d(Thax)(4.*pi*x*(2.*Cg*(ur*ar)*(ar*ar)));
+    real[int] dE = vdj(0,Vhax);
+    dE += dGPm * X;
+    return dE;
+}
+
+func real[int] Norm(real[int] &X)
+{
+	real[int] c(1);
+	real[int] tmp = NWFm * X;
+	c[0] = X'*tmp;
+	return c;
+}
+
+matrix Jacobian;
+func matrix JacNorm(real[int] &X)
+{
+	real[int,int] jacnorm(1,Vhax.ndof);
+	jacnorm(0,:) = NWFm * X;
+	jacnorm *= 2.;
+	Jacobian = jacnorm;
+	return Jacobian;
+}
+
+func real[int] dNorm(real[int] &X)
+{
+	real[int] dnorm = NWFm * X;
+	dnorm *= 2.;
+	return dnorm;
+}
+
+matrix Hessian;
+func matrix d2Lag(real[int] &X)
+{//-----------file to store the echo of the main parameters
+	Vhax ar;
+	ar[] = X;
+	varf vfhnqp(ur,vr) = 
+		int2d(Thax)(4.*pi*x*(2.*Cg*(ar^2.)*(vr*ur) + 4.*Cg*(ar*vr)*(ar*ur)));
+	matrix HEgp = vfhnqp(Vhax,Vhax);
+	HEgp = HEgp + dGPm;
+	Hessian = HEgp;
+	return Hessian;
+}
+
+//======================================================
+//Loop initialisation
+//======================================================
+
+Vhax u0 = sqrt(rhoTFax);
+real[int] cax=[1];
+real cost=1; 
+Vhax uur = u0 ; 
+real ok;
+real cpuIpoptax = clock();
+
+//======================================================
+//Loop with Ipopt
+//======================================================
+ real cpu = clock();
+  for(int kk=1,nok=0;kk<= nbopt; ++kk)
+  {  
+
+
+    ok=IPOPT(Egp,dEgp,d2Lag,uur[],tol=tolax,maxiter=maxiter,objvalue=cost); // use Ipopt
+ 
+  
+  }//end for
+
+//======================================================
+// rotation to find 3D solution
+//======================================================
+
+Vhtot cylr   = sqrt(x*x + y*y);
+Vhtot cylth  = (cylr > 0)? atan2(y,x) : 0.;
+
+untot = (cylr > 0)? uur(cylr,abs(z))*(cos(mod*cylth)+li*sin(mod*cylth)) : 0. ;
+unrtot = real(un); unitot =imag(un);
+ cpuIpoptax = clock() - cpuIpoptax;
+ cout << "initial condition builded with Ipopt in " << cpuIpoptax << "s" << endl;
+ fout << "initial condition builded with Ipopt in " << cpuIpoptax << "s" << endl;
+
+  //umod= sqrt(square(real(un))+square(imag(un)));
+  //medit("initialization for |u|",Th,umod,order=1);
+
+          

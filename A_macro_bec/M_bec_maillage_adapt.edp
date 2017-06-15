@@ -1,0 +1,38 @@
+//===============================================================
+// adapts the mesh for BEC simulations
+//  + eventually make the  mesh axisymmetric
+// interpolates the main variables on the new mesh
+//===============================================================
+
+include "../A_macro/Macro_maillage_axisym.edp";
+
+macro  meshBECadapt(Th,Vh,un,ifad,hminad,ifax,hminax,IWAIT)
+{
+   if(ifad)
+   { 
+      cout<<"######### MAKE ADAPT MESH "<<endl;  
+      fout<<"######### MAKE ADAPT MESH "<<endl; 
+      
+      /*Th = adaptmesh(Th, [sqrt(norm(un))],hmin=hminad,err=0.1,ratio=1.3,anisomax=2,nbvx=10^6);*/
+        Th = adaptmesh(Th, [real(un),imag(un)],hmin=hminad,err=0.1,ratio=1.3,anisomax=2,nbvx=10^6);
+
+	/*plot(Th,wait=1,cmm="(init) NEW mesh of the domain :: after adapt");*/
+	plot(Th,wait=IWAIT,cmm="NEW mesh of the domain :: after adapt");
+   }
+
+   if(ifax)
+   {
+      cout<<"######### MAKE MESH AXISYMMETRIC"<<endl;  
+      fout<<"######### MAKE MESH AXISYMMETRIC"<<endl;  
+       
+       real hmin=0.1;
+       meshaxisym(Th,Vh,real(un),imag(un),hminax);
+
+       /*plot(Th,wait=1,cmm="(init) NEW mesh of the domain :: after axisym");*/
+         plot(Th,wait=IWAIT,cmm="NEW mesh of the domain :: after axisym");
+
+   }   
+   
+   un = un;  /* interpolates the solution on the new mesh */
+
+}// EOM

@@ -1,0 +1,47 @@
+if(mpirank == 0){
+  Vhtot   rr2     = x*x+ y*y;
+  Vhtot   rr      = sqrt(rr2);
+  Vhtot   Vbar    = ax*x*x+ay*y*y+az*z*z+a4*rr2*rr2;   /* trapping potential */
+  Vhtot   Ctrap   = 0.5*Vbar/(ep*ep);          /* Ctrap function --> 1/2 factor */
+  Vhtot   Vbaref  = Vbar-Omop*Omop*rr2;         /* effective trapping potential */
+  Vhtot   Ctrapef = 0.5*Vbaref/(ep*ep);         /* effective trapping potential */
+
+  Vhtot rhoTF    = (mu-Ctrap>0)?(mu-Ctrap):0. ;         // atomic density Thomas-Fermi
+  Vhtot rhoTFef  = (mu-Ctrapef>0)?(mu-Ctrapef):0. ;   // atomic density Thomas-Fermi
+
+  if(mu < 10*mustart){
+    if (initi == "Ipoptaxi") {include "../A_macro_bec_3D/BEC_3D_Ipoptaxi_init.idp";}  /*initialize u^n from Ipot axisymmetric*/
+    if ( (initi == "TF" && Nv == 0) || (initi == "TF" && shape != "I") ) {unrtot = sqrt(rhoTF); unitot = 0.; untot = unrtot + li*unitot;} /* initialize u^n from TF*/
+    if (initi == "TF" && Nv > 0 && shape == "I") {unrtot = (rr>0)?sqrt(rhoTF):0; unitot = 0.; untot = unrtot + li*unitot;} /* initialize u^n from TF*/
+
+    // add the vortex
+    if(ifDS=="TF") 
+      {  include "../A_macro_bec_3D/M_bec_addvortices.edp";
+	real epsvor = 1./pow(2.*Cg,0.25); // size of a vortex 
+	Rarr   = Rarr*Rmax;
+	dRarr  = dRarr*Rmax;
+	addARvortex(ThGlob, Vhtot, untot, Rmax, epsvor, narray, Nv, Rarr, Tharr, dRarr, dTharr);
+	unrtot = real(untot);
+	unitot = imag(untot);
+      }
+
+    // add the ring
+    if(ifDS=="RS") 
+       {
+	 real Rring = sqrt(mu/(2*omadim^2));
+         unrtot = (omadim*rr2-1)*exp(-omadim*rr2/2);
+	 unitot = 0;
+	 untot = unrtot + li*unitot;
+       }
+  }
+
+  else{
+    int ITER0 = 0;
+    mesh3 Thtmp = readmesh3(dirload+scasebefore+".mesh");
+    fespace Vhtmp(Thtmp,FEchoice);
+    Vhtmp<complex> utmp,utmpconj;
+    restartload(utmp,dirload+scasebefore+".rst",ITER0);
+    untot[] = 0;
+    untot = utmp;
+  }
+ }

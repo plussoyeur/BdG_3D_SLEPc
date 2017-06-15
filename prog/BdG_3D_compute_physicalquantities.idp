@@ -1,0 +1,41 @@
+//===============================================================
+// compute the physical quantities
+//===============================================================
+energy = 0;
+energyLoc = energ(Th,un,unconj);
+mpiReduce(energyLoc,energy,processor(0),mpiSUM);
+
+lzcalc = 0;
+lzLoc = Lzi(Th,un,unconj);
+mpiReduce(lzLoc,lzcalc,processor(0),mpiSUM);
+
+denscalc = 0;
+densLoc = density(Th,un);
+mpiReduce(densLoc,denscalc,processor(0),mpiSUM);
+
+mucalc = 0;
+muLoc = energyLoc + int3d(Th)(0.5*Cg*Dh*un2(un)*un2(un));
+mpiReduce(muLoc,mucalc,processor(0),mpiSUM);
+if(mpirank == 0) mucalc = mucalc/denscalc;
+
+
+
+fenerg << detail << endl;
+fenerg << "energy : "<< energy << endl;
+
+if(mpirank ==0)  cout << detail
+		      << "iter =" << iter
+		      <<" energy   ="  << energy
+		      <<"     Lz   ="  << lzcalc
+		      <<" density  ="  << denscalc  
+		      <<"     mu   ="  << mucalc <<endl;
+
+if(mpirank ==0)  fout << detail
+		      << "iter =" << iter
+		      <<" energy   ="  << energy
+		      <<"     Lz   ="  << lzcalc
+		      <<" density  ="  << denscalc  
+		      <<"     mu   ="  << mucalc <<endl;
+
+if(mpirank ==0)  cout<<" ========= theoretical density="<< 8.*pi*pow(mu,5./2.)/15./sqrt(ax*ay*az/8.)<<endl;
+if(mpirank ==0)  cout<<" ========= calculated  density="<< denscalc <<endl;

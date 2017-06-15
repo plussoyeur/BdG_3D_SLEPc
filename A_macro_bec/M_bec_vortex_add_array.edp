@@ -1,0 +1,62 @@
+//===============================================================
+// computes the initial condition as
+// Thomas-Fermi density profile * ansatz for an array of vortices
+//----------------------
+// un     = the TF density profile
+// epsvor = (estimated) diameter of a vortex
+// narray = number of successive cercle of vortices
+// Nv     = number of vortices on each array
+// Rarr   = the radius of the first cercle of vortices
+// Tharr  = theta      of the first cercle of vortices
+// dRarr  = step for the radius
+// dTharr = step for theta
+//===============================================================
+
+
+include "../A_macro_bec/M_bec_vortex_add_one.edp";
+
+
+macro  addARvortex(Th, Vh, un, Rmax,epsvor, narray, Nv, Rarr, Tharr, dRarr, dTharr)
+{
+  Vh<complex> uvortex;
+  real xvor, yvor;
+
+  if(narray==1 && Nv==1)
+    {/* add a single vortex */
+      xvor = Rarr*cos(Tharr);
+      yvor = Rarr*sin(Tharr) ; 
+
+      cout <<"======vortex   xvor = "<< xvor <<"  yvor ="<< yvor <<endl;
+      fout <<"======vortex   xvor = "<< xvor <<"  yvor ="<< yvor <<endl;
+     
+   addvortex(Th, Vh, xvor, yvor, epsvor, uvortex);
+   un = un *uvortex;                   
+    }
+  else
+    {/* add successive circles of vortices */
+
+      real Rcv, Tcv, thetav;
+      for(int iarray=0; iarray < narray; iarray++)  
+	{ Rcv = Rarr  + iarray*dRarr;  /* increment position radius*/
+          Tcv = Tharr + iarray*dTharr;   /* increment position theta */
+
+          if(Rcv > Rmax) break;
+
+	  Nv = Nv + iarray*Nv; /* trick to put more vortices on the next cercle*/        
+          cout<<"====== Nv ="<<Nv<<endl;
+          
+         for(int iv=0;iv < Nv;iv++)
+         { 
+           thetav = Tcv + (2*pi/Nv)*iv ;
+
+           xvor = Rcv*cos(thetav); 
+           yvor = Rcv*sin(thetav);
+           cout <<"=== Varray="<<iarray<<"  vortex "<<iv+1<<"   xvor = "<< xvor <<"  yvor ="<< yvor <<endl;
+           fout <<"=== Varray="<<iarray<<"  vortex "<<iv+1<<"   xvor = "<< xvor <<"  yvor ="<< yvor <<endl;
+     
+           addvortex(Th, Vh, xvor, yvor, epsvor, uvortex);
+           un = un *uvortex;
+          }
+       }
+    }
+}// EOM

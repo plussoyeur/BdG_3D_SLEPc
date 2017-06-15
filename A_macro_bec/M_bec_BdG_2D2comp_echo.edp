@@ -1,0 +1,81 @@
+//===============================================================
+// echo main parameters
+//===============================================================
+
+cout<<"----------SAVE DIRECTORY:: " << dircase <<endl;
+cout<<"==========================================="<<endl;
+
+cout<<"========== Physical  parameters ============="<<endl;
+cout<<"mu1       = "<< mu1 <<endl;
+cout<<"mu2       = "<< mu2 <<endl;
+cout<<"Omz/Omp  = "<<omadim<<endl;
+cout<<"==========================================="<<endl;
+
+cout<<"========== Two-component  parameters ============="<<endl;
+cout<<"beta11       = "<< beta11 <<endl;
+cout<<"beta22       = "<< beta22 <<endl;
+cout<<"beta12       = "<< beta12 <<endl;
+cout<<"beta21       = "<< beta21 <<endl;
+cout<<"==========================================="<<endl;
+
+cout<<"========== Trapping potential ============="<<endl;
+cout<<"ax     = "<< ax << endl;
+cout<<"ay     = "<< ay << endl;
+cout<<"a2     = "<< a2 << endl;
+cout<<"a4     = "<< a4 << endl;
+cout<<"==========================================="<<endl;
+
+cout<<"========== Mesh  parameters ============="<<endl;
+cout<<"  Rmax1  ="<<Rmax1<<endl;
+cout<<"  Rmax2  ="<<Rmax2<<endl;
+cout<<"  Rdom  ="<<Rdom<<endl;
+cout<<"  nbseg ="<<n1d-1<<endl;
+cout<<"==========================================="<<endl;
+
+cout<<"========== Run  parameters ============="<<endl;
+cout << "Method      :: "<< smeth <<endl;
+cout << "Time step dt:: "<< dt    <<endl;
+cout << "EPS converg :: "<< EPS0  <<endl;
+cout<<"==========================================="<<endl;
+
+cout<<"==========================================="<<endl;
+
+fout<<"----------SAVE DIRECTORY:: " << dircase <<endl;
+fout<<"==========================================="<<endl;
+
+fout<<"========== Physical  parameters ============="<<endl;
+fout<<"mu1       = "<< mu1 <<endl;
+fout<<"mu1       = "<< mu2 <<endl;
+fout<<"Omz/Omp  = "<<omadim<<endl;
+fout<<"==========================================="<<endl;
+
+fout<<"========== Two-component  parameters ============="<<endl;
+fout<<"beta11       = "<< beta11 <<endl;
+fout<<"beta22       = "<< beta22 <<endl;
+fout<<"beta12       = "<< beta12 <<endl;
+fout<<"beta21       = "<< beta21 <<endl;
+fout<<"==========================================="<<endl;
+
+
+
+fout<<"========== Trapping potential ============="<<endl;
+fout<<"ax     = "<< ax << endl;
+fout<<"ay     = "<< ay << endl;
+fout<<"a2     = "<< a2 << endl;
+fout<<"a4     = "<< a4 << endl;
+fout<<"==========================================="<<endl;
+
+fout<<"========== Mesh  parameters ============="<<endl;
+fout<<"  Rmax1  ="<<Rmax1<<endl;
+fout<<"  Rmax2  ="<<Rmax2<<endl;
+fout<<"  Xdom  ="<<Rdom<<endl;
+fout<<"  nbseg ="<<n1d-1<<endl;
+fout<<"==========================================="<<endl;
+
+fout<<"========== Run  parameters ============="<<endl;
+fout << "Method      :: "<< smeth <<endl;
+fout << "Time step dt:: "<< dt    <<endl;
+fout << "EPS converg :: "<< EPS0  <<endl;
+fout<<"==========================================="<<endl;
+
+fout<<"==========================================="<<endl;

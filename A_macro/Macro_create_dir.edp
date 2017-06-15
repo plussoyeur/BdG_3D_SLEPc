@@ -1,0 +1,29 @@
+//===============================================================
+// creates a directory
+// works for all systems (version > 3.20)
+// attention, do not use  { } in the definition of the macro  !!!
+//===============================================================
+
+ macro createDIR(dircase)
+/*(Linux only valid for old versions too)*/
+/*    exec("if  test -d  "+dircase+"  ; then  echo \"-----> directory already exists\" ;" 
+        +"else   echo \"---> create directory\" ; mkdir "+dircase+ " ; fi");
+*/
+  
+/*(all systems) new versions of FreeFem*/
+         load "shell";
+         cout<<"======================================================="<<endl; 
+         {         
+	   if(isdir(dircase) < 0)
+	   {  int ok=mkdir(dircase); 
+	     cout<<isdir(dircase)<<" ======== Directory "<<dircase<<"  was created !!  " << ok<< endl;
+           } 
+	   else if(isdir(dircase) > 0)
+            cout<<"======== Directory "<<dircase<<"  already exists !!"<<endl;
+           else
+            cout<<"======== !!!!! "<<dircase<<"  is a file !! directory not created "<<endl;
+
+         cout<<"======================================================="<<endl; 
+	 }
+// EOM  
+

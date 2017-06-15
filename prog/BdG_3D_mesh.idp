@@ -1,0 +1,48 @@
+//===================================================================//
+macro partitioner()metis// End Of Macro  // metis, scotch, or parmetis
+
+macro dimension()3// EOM            // 2D or 3D
+macro def(i)[i, i#B]// EOM          // scalar field definition
+macro init(i)[i, i]// EOM           // scalar field initialization
+//===================================================================//
+
+
+//===================================================================//
+include "macro_ddm.idp"; //added in the folder to have a P1
+                         //partition of unity (Dh in macro_ddm)
+                         //you must declare a P1 function Dh !!
+include "cube.idp";
+//===================================================================//
+
+
+//===================================================================//
+int[int, int] LL = [[2,2], [1,1], [1,1]];
+real[int, int] BB = [[0,1], [0,1], [0,1]];
+int[int] CC = [1, 1, 1];
+
+mesh3 Th = Cube(CC, BB, LL);
+mesh3 ThGlob;
+
+fespace VhP1(Th,P1);
+fespace Vh(Th,FEchoice);
+fespace Vhvec(Th,Pk);          // vector finite-element space
+
+int[int] arrayIntersection;                 // ranks of neighboring subdomains
+int[int][int] restrictionIntersection(0);   // local-to-neighbors renumbering
+real[int] D;                                // partition of unity
+
+VhP1 Dh;
+
+// create global mesh
+ThGlob= Buildmesh(meshkind,Rdom,Rdom,Rzdom,nbseg,hminsurf,hminvol);
+
+{
+  mesh3 ThBorder;
+  mesh3 Thtmp = ThGlob; //otherwise ThGLob get truncated
+  build(Th, ThBorder, Thtmp, 10, 1, 1, D, arrayIntersection, restrictionIntersection, Vhvec, Pk, mpiCommWorld, false)
+}
+
+fespace Vhtot(ThGlob,FEchoice);
+fespace Vhvectot(ThGlob,Pk);
+//===================================================================//
+

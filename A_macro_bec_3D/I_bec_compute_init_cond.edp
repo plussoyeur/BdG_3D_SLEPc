@@ -1,0 +1,83 @@
+//===============================================================
+// Compute the initial condition for the run
+//===============================================================
+
+
+macro computeINIT(ifILint,ifILrst)
+
+cout<<"========== Initial condition ============="<<endl;
+fout<<"========== Initial condition ============="<<endl;
+
+   if(ifILint)      
+     {
+      /*load both ab.msh and ab.rst restart file and interpolate on Th*/
+      restartloadint(un,dirload+"ab",ITER0); 
+      ITER0=0; 
+     }
+   else
+     {
+       if(ifILrst) /* load only the rst file*/
+         {restartload(un,dirload+scase+"_fin.rst",ITER0);}
+       else      /* generate initial condition */
+         {
+          cout<<"---- generate initial condition ============="<<endl;
+          fout<<"---- generate initial condition ============="<<endl;
+
+          un =sqrt(rhoTFO)*fsmooth(rr,Rsmooth) + li*0; /* initialize u^n from TF*/
+          /* add vortices */
+          real epsvor = (ep != 1?ep:1./pow(CN,0.25)); /* size of a vortex */ 
+          Rarr   = Rarr*Rmax;
+          dRarr  = dRarr*Rmax;
+          addARvortex(Th, Vh, un, Rmax, epsvor, narray, Nv, Rarr, Tharr, dRarr, dTharr);
+         }
+    }
+
+/* -------------------------
+normalize the initial condition
+---------------------------*/
+
+    BECnormalize(Th,un,Normu,ur,ui,umod,"Initial cond : ",fout);
+   
+/* -------------------------
+adapt mesh following the initial condition
+---------------------------*/
+
+  if(ifIadapt||ifIsym)
+  {
+    meshBECadapt(Th,Vh,un,ifIadapt,hminad,ifIsym,hminax,IWAIT);  
+
+    BECnormalize(Th,un,Normu,ur,ui,umod,"Initial cond + adapt/axisym : ",fout);
+
+   computevarFE(" TF initial cond after mesh  adapt");
+
+  }
+
+
+/* -------------------------
+save mesh 
+---------------------------*/
+
+   savemesh   (Th,fcase+"_"+ITER0+".msh");
+   restartsave(un,fcase+"_"+ITER0+".rst",ITER0);  /* for further reference*/
+      
+/* -------------------------
+visualize the initial condition
+---------------------------*/
+ 
+    plot(umod,wait=IWAIT,cmm="initialization for |u|",value=1);
+    plot(ur,  wait=IWAIT,cmm="initialization for Real(u)",value=1);  
+    plot(ui,  wait=IWAIT,cmm="initialization for Imag(u)",value=1);  
+
+
+
+/* -------------------------
+save Tecplot files for the initial condition
+---------------------------*/
+ 
+    real xl1=-Rdom, yl1=0, xl2=Rdom, yl2=0; int npplot=nbseg*10;/* to extract data along line */
+      
+    savetecplot3scale(Th,Vh,fcase+"_init_"+ITER0+".dat",ur,ui,umod,"Ur","Ui","Umod","initial cond",scalex,scalev);
+    extractDlignescale(Th,Vh,umod,xl1,yl1,xl2,yl2,npplot,fcase+"_init_"+ITER0+"_tec_l.dat","U","line_init_cond",scalex,scalev);
+
+
+//EOM

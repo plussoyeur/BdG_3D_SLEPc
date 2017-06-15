@@ -1,0 +1,76 @@
+/*  valid for 3D  cases */
+NewMacro  Newtonfixmu3d(iter,EPS0,ITERMAX,ipass)
+{
+  real cputime = mpiWtime();
+iter=0; 
+epsiter=10;
+
+ Vhvec [aN,bN],[v1n,v2n],[s1N,s2N];
+ Th = change(Th,fregion=nuTriangle*mpisize/(Th.nt));
+ 
+ 
+ // problem  aNewton([aN,bN],[v1n,v2n],solver=UMFPACK)=
+ //                     int3d(Th)(0.5*(dx(aN)*dx(v1n) + dy(aN)*dy(v1n) + dz(aN)*dz(v1n)) + (Ctrap+ Cg*(3*unr^2+   uni^2) - mu)*aN*v1n)
+ //                    +int3d(Th)(0.5*(dx(bN)*dx(v2n) + dy(bN)*dy(v2n) + dz(bN)*dz(v2n)) + (Ctrap+ Cg*(  unr^2+ 3*uni^2) - mu)*bN*v2n)
+ //                    +int3d(Th)(2*Cg*unr*uni*(bN*v1n + aN*v2n))
+ //                    -int3d(Th,qforder=qforder)(0.5*(dx(unr)*dx(v1n) + dy(unr)*dy(v1n) + dz(unr)*dz(v1n)) + (Ctrap+Cg*(unr^2+ uni^2) - mu)*unr*v1n)
+ //                    -int3d(Th,qforder=qforder)(0.5*(dx(uni)*dx(v2n) + dy(uni)*dy(v2n) + dz(uni)*dz(v2n)) + (Ctrap+Cg*(unr^2+ uni^2) - mu)*uni*v2n)
+ //                    + on(0,aN=0) +  on(0,bN=0) ;
+
+ varf aNewton([aN,bN],[v1n,v2n]) =
+   int3d(Th,mpirank)(0.5*(dx(aN)*dx(v1n) + dy(aN)*dy(v1n) + dz(aN)*dz(v1n)) + (Ctrap+ Cg*(3*unr^2+   uni^2) - mu)*aN*v1n) +
+   int3d(Th,mpirank)(0.5*(dx(bN)*dx(v2n) + dy(bN)*dy(v2n) + dz(bN)*dz(v2n)) + (Ctrap+ Cg*(  unr^2+ 3*uni^2) - mu)*bN*v2n) +
+   int3d(Th,mpirank)(2*Cg*unr*uni*(bN*v1n + aN*v2n)) +
+   on(0,mpirank,aN=0) +
+   on(0,mpirank,bN=0);
+
+ varf bNewton([aN,bN],[v1n,v2n]) =
+    int3d(Th,mpirank,qforder=qforder)(0.5*(dx(unr)*dx(v1n) + dy(unr)*dy(v1n) + dz(unr)*dz(v1n)) + (Ctrap+Cg*(unr^2+ uni^2) - mu)*unr*v1n)
+  + int3d(Th,mpirank,qforder=qforder)(0.5*(dx(uni)*dx(v2n) + dy(uni)*dy(v2n) + dz(uni)*dz(v2n)) + (Ctrap+Cg*(unr^2+ uni^2) - mu)*uni*v2n);
+
+
+
+ 
+  while(epsiter > EPS0 && iter < ITERMAX)
+ {
+  iter++; 
+
+  //aNewton;
+
+  matrix aNewt = aNewton(Vhvec,Vhvec,solver=CG);
+  
+  // matrix tmp = -aNewt';
+  // tmp = tmp + aNewt;
+  // tmp.thresholding(1.e-10);
+  // cout << tmp << endl;
+
+  aNewt.thresholding(1.e-10);
+  set(aNewt,solver=sparsesolver,master=-1);
+  if(mpirank==0) cout << aNewt.nnz << endl;
+  
+      s1N[] = bNewton(0,Vhvec);
+
+      aN[] = aNewt^-1 * s1N[];
+
+      
+      unr = unr - aN;    
+      uni = uni - bN;
+      
+      epsiter= aN[].linfty;
+
+     umod = (unr*unr+uni*uni);
+     /*medit("ipass = "+ipass+" iter = "+iter,Th,umod,wait=iwait,order=1);*/
+     siter =funciter(iter); 
+     un = unr + li*uni;
+     if(mpirank == 0) mysavemesh(Th,fcase+"_ipass"+ipass+"_iter"+siter+".msh",prec);   
+     if(mpirank == 0) restartsave(un,fcase+"_ipass"+ipass+"_iter"+siter+".rst",iter); 
+
+     if(mpirank == 0) cout << "Newton iter="<<iter<<" epsiter = " << epsiter <<endl;
+     if(mpirank == 0) fout << "Newton iter="<<iter<<" epsiter = " << epsiter <<endl;
+
+                                                    
+ } /* end Newton loop*/
+if(mpirank == 0) cout <<"svlkhzeklghezi : " << mpiWtime()-cputime << endl;
+  
+}
+//EndMacro

@@ -1,0 +1,26 @@
+/*  saves a complex field for Bogliubov :: 1D case and 2d case */
+
+macro  saveBdG1d(Th,Vh,Psir,Psii,fdeb,fend,zname)
+{
+     Vh Psimod = Psir^2 + Psii^2;
+
+     savetecplot3(Th,Vh,fdeb+"_2D"+fend,Psir,Psii,Psimod,"Ur","Ui","Umod",zname);
+
+     extractDborder(Th,Vh,Psimod,1,fdeb+"_1Dx_m"+fend,"Umod",zname);
+     extractDborder(Th,Vh,Psir  ,1,fdeb+"_1Dx_r"+fend,"Ur",zname);
+     extractDborder(Th,Vh,Psii  ,1,fdeb+"_1Dx_i"+fend,"Ui",zname);
+
+}
+//EOM
+
+macro  saveBdG2d(Th,Vh,Psir,Psii,fdeb,fend,zname)
+{
+     Vh Psimod = Psir^2 + Psii^2;
+
+     savetecplot3(Th,Vh,fdeb+"_2D"+fend,Psir,Psii,Psimod,"Ur","Ui","Umod",zname);
+
+     extractDlignescale(Th,Vh,Psimod,xl1,yl1,xl2,yl2,npplot,fdeb+"_1Dx_m"+fend,"Umod",zname,scalex,scalev);
+     extractDlignescale(Th,Vh,Psir  ,xl1,yl1,xl2,yl2,npplot,fdeb+"_1Dx_r"+fend,"Ur",zname,scalex,scalev);
+     extractDlignescale(Th,Vh,Psii  ,xl1,yl1,xl2,yl2,npplot,fdeb+"_1Dx_i"+fend,"Ui",zname,scalex,scalev);
+}
+//EOM

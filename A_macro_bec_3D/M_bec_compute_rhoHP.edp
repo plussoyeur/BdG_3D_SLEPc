@@ -1,0 +1,24 @@
+//===============================================================
+// macro computing rho0
+// for the Thomas-Fermi approximation
+// harmonic potential
+//===============================================================
+
+
+macro  computerhoHP(rho0,Rx,Ry,Rz,ax,ay,az,eps,Cg,Omop)
+{
+  /* takes into account the effective potential*/
+     real axo = ax-Omop*Omop; 
+     real ayo = ay-Omop*Omop; 
+     real azo = az; 
+  /* parameters*/
+      real vscale = eps*eps*2.*Cg;
+      real  axyz   = sqrt(axo*ayo*azo);
+      
+  /* results */
+  
+       rho0=((15./(8.*pi))*axyz*vscale)^(2./5.);
+       Rx=sqrt(rho0/axo);
+       Ry=sqrt(rho0/ayo);
+       Rz=(ax==ay==az)?Rx:sqrt(rho0/azo);
+}// EOM

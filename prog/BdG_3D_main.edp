@@ -1,0 +1,157 @@
+//===============================================================
+//  Bogoliubov-de Gennes model for 3D problems 
+// 
+//===============================================================  
+//  Newton method
+//  applied separately to the real and imaginary parts 
+//  version using the "varf" syntax to build matrices
+//===============================================================   
+//  07 April 2016 
+//  25 Mai 2016  correct Newton coupling
+//  May-June 2017 Parallelisation (using PETSc and SLEPc)
+//                emeriau.pe@gmail.com
+//===============================================================
+
+   load "msh3";
+   load "tetgen";
+   load "mshmet";
+   load "mmg3d-v4.0";
+   load "aniso";
+   load "freeyams";
+   load "ff-Ipopt";
+   load "medit";
+   load "PETSc-complex";
+   load "SLEPc-complex";
+
+//===============================================================
+// general macros 
+//===============================================================
+   include "../A_macro/Macro_create_dir.edp";
+   include "getARGV.idp";
+   include "../A_macro_bec_3D/M_bec_amain_macro_PETSc.edp";
+
+//===============================================================
+// Macro to build the mesh
+//===============================================================
+   include "../A_macro_bec_3D/M_bec_maillage.edp";
+
+//===============================================================
+// macro to restart the computation
+//===============================================================
+   include "../A_macro_bec_3D/M_bec_Mysavemesh.edp";     // saves restart file
+   include "../A_macro_bec/M_bec_restart_save.edp";     // saves restart file
+   include "../A_macro_bec/M_bec_restart_load.edp";     // load restart file
+
+
+//===============================================================
+// parameters
+//===============================================================
+   macro  FEchoice   P2//
+   func Pk = [P2, P2]; //for ddm
+   string FEchoiceS="P2";
+   complex li   = 1i;
+
+   include "BdG_3D_parameters.idp";
+
+//===============================================================
+// create the 3d mesh and distribute it to procs
+//
+// ThGlob -> global 3D mesh
+// Th -> local 3D mesh
+//
+// fespace VhP1(Th,P1);
+// fespace Vh(Th,FEchoice);
+// fespace Vhvec(Th,[FEchoice,FEchoice]);
+// fespace Vhtot(ThGlob,FEchoice);
+// fespace Vhvectot(ThGlob,[FEchoice,FEchoice]);
+//===============================================================
+   include "BdG_3D_mesh.idp";
+
+//====================================================
+// Local potential
+//====================================================
+  Vh   rr2Loc     = x*x+ y*y;
+  Vh   rrLoc      = sqrt(rr2Loc);
+  Vh   VbarLoc    = ax*x*x+ay*y*y+az*z*z+a4*rr2Loc*rr2Loc;   /* trapping potential */
+  Vh   CtrapLoc   = 0.5*VbarLoc/(ep*ep);          /* Ctrap function --> 1/2 factor */
+  Vh   VbarefLoc  = VbarLoc-Omop*Omop*rr2Loc;         /* effective trapping potential */
+  Vh   CtrapefLoc = 0.5*VbarefLoc/(ep*ep);         /* effective trapping potential */
+
+//===============================================================
+// initialisation
+// if mu = mu_start
+//       create un init (TF, central vortex I, or U/S shaped vortex)
+// elif mu > mu_start
+//       read un from mu-delta_mu
+//===============================================================
+   Vh<complex> un, unconj;
+   Vh          unr, uni;
+
+   Vhtot<complex> untot, untottmp;
+   Vhtot unrtot, unitot;
+
+   include "BdG_3D_init.idp";
+
+
+   broadcast(processor(0),untot[]);
+
+//To visualize initial state
+// if(mpirank == 0){
+//   Vhtot rho = abs(untot)^2;
+//   medit("un init",ThGlob,rho,wait=1,order=1);
+//  }
+
+// Create restriction matrix
+   matrix<complex> R;
+   {
+     matrix tmpR = interpolate(Vh,Vhtot);
+     R = tmpR;
+   }
+
+// Restrict untot to have a local un
+   un[] = R*untot[];
+   unr[] = un[].re;
+   uni[] = un[].im;
+   unconj = conj(un);
+
+// Compute energy, density, chemical potential
+   string detail = "Initialisation : ";
+   include "BdG_3D_compute_physicalquantities.idp";
+
+
+//===============================================================
+// Newton
+//===============================================================
+   include "BdG_3D_Newton.idp"; //solve for uni, unr
+      un = unr + li*uni;
+      unconj = conj(un);
+ 
+   detail = "After Newton : ";
+   include "BdG_3D_compute_physicalquantities.idp";
+
+// Save for restart at next mu
+   {
+     Vhtot<complex> untottmp;
+     Vh<complex>    untmp;
+     Vh             Dhh; //P2 parition of unity
+
+     Dhh = Dh; //inteprolate the P1 one
+     untmp[].re = Dhh[].*(un[].re);
+     untmp[].im = Dhh[].*(un[].im);
+     untottmp[] = R'*untmp[];
+
+     untot[] = 0;
+     mpiReduce(untottmp[],untot[],processor(0),mpiSUM);
+   }
+
+  if(mpirank == 0){
+    int prec = 50;
+    mysavemesh(ThGlob,dircase+scase+".mesh",prec);
+    restartsave(untot,dircase+scase+".rst",iter);
+      }
+
+
+//===============================================================
+// Generalized Eigenvalue system (BdG modes)
+//===============================================================
+   include "BdG_3D_Eigenvalues.idp";

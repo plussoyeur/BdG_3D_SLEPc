@@ -1,0 +1,55 @@
+cout<<"----------SAVE DIRECTORY:: " << dircase <<endl;
+cout<<"==========================================="<<endl;
+
+cout<<"========== Physical  parameters ============="<<endl;
+cout<<"mu       = "<< mu <<endl;
+cout<<"Omp/Omz  = "<<omadim<<endl;
+cout<<"==========================================="<<endl;
+
+cout<<"========== Trapping potential ============="<<endl;
+cout<<"ax     = "<< ax << endl;
+cout<<"ay     = "<< ay << endl;
+cout<<"az     = "<< az << endl;
+cout<<"a2     = "<< a2 << endl;
+cout<<"a4     = "<< a4 << endl;
+cout<<"==========================================="<<endl;
+
+cout<<"========== Mesh  parameters ============="<<endl;
+cout<<"  Rmax  ="<<Rmax<<endl;
+cout<<"  Rdom  ="<<Rdom<<endl;
+cout<<"==========================================="<<endl;
+
+cout<<"========== Run  parameters ============="<<endl;
+cout << "Method      :: "<< "Newton" <<endl;
+cout << "EPS converg :: "<< EPS0  <<endl;
+cout<<"==========================================="<<endl;
+
+cout<<"==========================================="<<endl;
+
+fout<<"----------SAVE DIRECTORY:: " << dircase <<endl;
+fout<<"==========================================="<<endl;
+
+fout<<"========== Physical  parameters ============="<<endl;
+fout<<"mu       = "<< mu <<endl;
+fout<<"Omp/Omz  = "<<omadim<<endl;
+fout<<"==========================================="<<endl;
+
+fout<<"========== Trapping potential ============="<<endl;
+fout<<"ax     = "<< ax << endl;
+fout<<"ay     = "<< ay << endl;
+fout<<"az     = "<< az << endl;
+fout<<"a2     = "<< a2 << endl;
+fout<<"a4     = "<< a4 << endl;
+fout<<"==========================================="<<endl;
+
+fout<<"========== Mesh  parameters ============="<<endl;
+fout<<"  Rmax  ="<<Rmax<<endl;
+fout<<"  Rdom  ="<<Rdom<<endl;
+fout<<"==========================================="<<endl;
+
+fout<<"========== Run  parameters ============="<<endl;
+fout << "Method      :: "<< "Newton" <<endl;
+fout << "EPS converg :: "<< EPS0  <<endl;
+fout<<"==========================================="<<endl;
+
+fout<<"==========================================="<<endl;

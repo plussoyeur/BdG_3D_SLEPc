@@ -1,0 +1,20 @@
+//===============================================================
+// adapts the mesh for BEC simulations
+// interpolates the main variables on the new mesh
+//===============================================================
+
+macro  meshBECadapt(Th,uur,uui,ifad,hminad,hmaxad,IWAIT,erradapt,anisoadapt,memory)
+{
+    if(ifad)
+    {
+      cout<<"######### MAKE ADAPT MESH "<<endl;  
+      fout<<"######### MAKE ADAPT MESH "<<endl; 
+        /*real[int] met=mshmet(Th,sqrt(norm(un)),err=0.01);*/
+        bool anisob = (anisoadapt>0);
+        real[int] met=mshmet(Th,uur,uui,hmin=hminad,hmax = hmaxad,err=erradapt,aniso=anisob);
+        if (anisoadapt) boundaniso(6,met,anisoadapt);
+        Th=mmg3d( Th, Mb = memory, metric=met,opt="-O 1");
+        plot(Th,wait=iwait,cmm="NEW mesh of the domain :: after adapt");
+
+     }
+}// EOM

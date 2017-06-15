@@ -1,0 +1,39 @@
+//===============================================================
+// Macro to create a new mesh 
+// with the same mesh density 
+// but with axisymmetric structure
+//===============================================================
+
+macro  meshaxisym(Th,Vh,ur,ui,hminloc)
+{
+    
+   Vh m11,m12,m22,hh,hhh;
+   /*hmin=0.1;  a changer ...*/ 
+   adaptmesh(Th,ur,ui,err=0.001,errg=0.001,metric=[m11[],m12[],m22[]],iso=1,nomeshgeneration=1,hmin=hminloc);
+
+   hh=m11;
+  
+   {
+    int nn= 10;
+    for(int i=0; i < nn;++i)
+     {
+        real theta = (2*pi*i)/nn;
+        real axx=cos(theta), axy= sin(theta) ;
+        real ayx=-axy, ayy = axx;
+        
+        func XX = x*axx+y*axy;
+        func YY = x*ayx+y*ayy;  
+        hhh    = hh(XX,YY);
+        plot(hhh,wait=0, cmm="hhh--"+i);   
+        hh = max(hh,hh(XX,YY));
+     } 
+      /*plot( hhh,wait=1);*/
+    hh=max(1./sqrt(hh),hminloc);
+    
+ 
+   }
+  Th=adaptmesh(Th, hh, IsMetric=1,nbvx=1000000,keepbackvertices=1,ratio=1.3);
+
+  plot(Th,wait=1,cmm="New mesh AXISYMMETRIC");
+
+}// EOM

@@ -1,0 +1,177 @@
+/*  this is an old and slightly buggy version : 
+the Jacobian in Newton is diagonal */
+
+macro  Newtonfixmu(iter,EPS0,ITERMAX,ITERPLOT,ipass,Menergy,MLz,Mdensity,Mchempot)
+{
+iter=0; 
+ epsiter=10;epsiteru=10;epsiterv=10;
+
+ fespace Vh4(Th,P4,periodic=[[1,x],[3,x]]);
+Vh u,v;
+
+varf  Vgrad(u,v)= int2d(Th)( 0.5*(dx(u)*dx(v)+dy(u)*dy(v)));
+varf  Vomega(u,v)= int2d(Th)(Comega*lzd(u)*v);
+varf  Vmass(u,v)= int2d(Th)(u*v);
+
+varf  VsysUr(u,v)= int2d(Th)( 0.5*(dx(u)*dx(v)+dy(u)*dy(v)) + Ctrap*u*v + Cg*(3*unr^2 +   uni^2)*u*v-mu*u*v)
+   + on(2,4,u=1);   
+varf  VsysUi(u,v)= int2d(Th)( 0.5*(dx(u)*dx(v)+dy(u)*dy(v)) + Ctrap*u*v + Cg*(  unr^2 + 3*uni^2)*u*v-mu*u*v)
+   + on(2,4,u=1);   
+varf  Vbc(u,v) = on(2,4,u=1);  
+
+
+ 
+/* rebuild  matrices and functions */
+
+ unr =unr;
+ uni =uni;cout<<"OK interp "<<Vh.ndof<<endl;
+ u =u;  /* needed if periodic BC */
+ v =v;
+ u4=u4;
+
+matrix Agrad   =  Vgrad (Vh, Vh);
+matrix AMass   =  Vmass (Vh, Vh);
+matrix Aomega  =  Vomega(Vh, Vh);
+matrix AMass4  =  Vmass4(Vh4,Vh);
+
+Vh  BC;    
+BC[] = Vbc(0,Vh,tgv=1); 
+BC[] = -BC[]; 
+BC[] += 1;
+
+rr2     = x*x+ y*y;
+rr      = sqrt(rr2);
+Vbar    = ax*x*x+ay*y*y+a4*rr2*rr2;   /* trapping potential */
+Ctrap   = 0.5*Vbar/(ep*ep);          /* Ctrap function --> 1/2 factor */
+Vbaref  = Vbar-Omop*Omop*rr2;         /* effective trapping potential */
+Ctrapef = 0.5*Vbaref/(ep*ep);         /* effective trapping potential */
+
+rhoTF  =(mu-Ctrap>0)?(mu-Ctrap):0. ;         /* atomic density Thomas-Fermi*/
+rhoTFef=(mu-Ctrapef>0)?(mu-Ctrapef):0. ;   /* atomic density Thomas-Fermi*/
+
+/* some optmizations*/
+
+   Vh  HnewR, HnewI;
+
+/* source term not needed here
+   real [int]    brhsfR  = AMass4*fs4R[];
+                 brhsfR *= (-1);
+   real [int]    brhsfI  = AMass4*fs4I[];
+                 brhsfI *= (-1);
+*/
+
+  while(epsiter > EPS0 && iter < ITERMAX)
+ {
+  
+  iter++; 
+  
+  /* non-linear terms treated within P4*/
+     
+       HnewR       =  Ctrap*unr + Cg*(unr^2+uni^2)*unr -mu*unr;
+       HnewI       =  Ctrap*uni + Cg*(unr^2+uni^2)*uni -mu*uni;
+            
+       /* rhs terms*/
+     
+     
+       real[int]     brhsR  = Aomega*uni[];
+                     brhsR  = Agrad *unr[];
+                     brhsR += AMass*HnewR[];
+		     /*                    brhsR += brhsfR ;*/
+                  
+       real[int]     brhsI  = Aomega*unr[];
+		     brhsI *= (-1);
+                     brhsI += Agrad *uni[];
+                     brhsI += AMass*HnewI[];
+                     /*                    brhsI += brhsfI ;*/
+                                    
+
+		     /* reinforce boundary condition u=0 on the border */    
+		     brhsR .*= BC[];     
+		     brhsI .*= BC[];    
+
+		     /* matrices of the system*/
+
+		     matrix AsysUr=VsysUr(Vh,Vh);
+		     matrix AsysUi=VsysUi(Vh,Vh);
+
+		set(AsysUr,solver=UMFPACK);
+		set(AsysUi,solver=UMFPACK);
+     
+		/* advance the solution; solve linear systems*/
+     
+		u[] = AsysUr^-1*brhsR;
+                v[] = AsysUi^-1*brhsI;
+
+     
+		/* update the solution*/
+           
+      unr[] = unr[] - u[];    
+      uni[] = uni[] - v[];
+
+      epsiteru = u[].linfty;
+      epsiterv = v[].linfty;
+      
+      epsiter=max(epsiteru,epsiterv);
+	    
+     un =unr + li*uni;   
+     unconj=conj(un);
+     
+     energy =   Menergy(Th,un,unconj); 
+     lzcalc=         MLz(Th,un,unconj);
+     denscalc = Mdensity(Th,un);
+     mucalc   = Mchempot(Th,un,unconj)/denscalc;
+
+          fenerg << iter <<"  "<< energy <<"  "<< lzcalc <<"  "<< denscalc <<"  "<< mucalc <<endl;
+
+     cout << "iter="<<iter<<" epsiter = " << epsiteru<<" epsiterv = " << epsiterv 
+                          <<" energy  ="  << energy
+                          <<"     Lz  ="  << lzcalc
+                          <<" density ="  << denscalc  
+                          <<"     mu  ="  << mucalc <<endl;
+
+     fout << "iter="<<iter<<" epsiter = " << epsiteru<<" epsiterv = " << epsiterv 
+                          <<" energy  ="  << energy
+                          <<"     Lz  ="  << lzcalc
+                          <<" density ="  << denscalc  
+                          <<"     mu  ="  << mucalc <<endl;
+
+     
+              if(iter%ITERPLOT == 0)
+   {
+     plot(unr,cmm="(real u) iteration="+iter,value=1,fill=1,dim=3,wait=iwait);
+     plot(uni,cmm="(imag u) iteration="+iter,value=1,fill=1,dim=3,wait=iwait);
+    
+     umod = sqrt(unr*unr+uni*uni);
+
+     siter =funciter(iter);
+     zname="iter"+siter;
+     savetecplot3(Th,Vh,fcase+"_pass_"+ipass+"_iter_"+siter+".dat",unr,uni,umod,"Ur","Ui","Umod",zname);
+     extractDborder(Th,Vh,umod,1,fcase+"_pass_"+ipass+"_iter_"+siter+"_1Dx_m.dat","Umod",zname);
+     extractDborder(Th,Vh,unr,1,fcase+"_pass_"+ipass+"_iter_"+siter+"_1Dx_r.dat","Ur",zname);    
+     extractDborder(Th,Vh,uni,1,fcase+"_pass_"+ipass+"_iter_"+siter+"_1Dx_i.dat","Ui",zname);    
+
+   }
+
+                                                      
+ } /* end Newton loop*/
+
+/* saves Tecplot (final) files*/ 
+
+     un =unr + li*uni;   
+     unconj=conj(un);   
+     plot(unr,cmm="(real u) iteration final="+iter,value=1,fill=1,dim=3,wait=iwait);
+     plot(uni,cmm="(imag u) iteration final="+iter,value=1,fill=1,dim=3,wait=iwait);
+
+     umod = sqrt(unr*unr+uni*uni);
+
+     siter =funciter(iter);
+     zname="iter"+siter;
+
+     savetecplot3  (Th,Vh,fcase+"_pass_"+ipass+"_iter_"+siter+"_final.dat",unr,uni,umod,"Ur","Ui","Umod",zname);
+     extractDborder(Th,Vh,umod,1,fcase+"_pass_"+ipass+"_iter_"+siter+"_final_1Dx_m.dat","Umod",zname);
+     extractDborder(Th,Vh,unr,1,fcase+"_pass_"+ipass+"_iter_"+siter+"_final_1Dx_r.dat","Ur",zname);    
+     extractDborder(Th,Vh,uni,1,fcase+"_pass_"+ipass+"_iter_"+siter+"_final_1Dx_i.dat","Ui",zname);    
+
+  
+}
+//EOM

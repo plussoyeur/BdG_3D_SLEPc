@@ -1,0 +1,62 @@
+//===============================================================
+// ansatz for a single 3D vortex to be multiplied with the
+// Thomas-Fermi density profile
+//===============================================================
+
+macro  addvortex(Th, Vh, xvor0, yvor0,curvature, vlength,epsvor,uvortex)
+{
+     
+  /* ansatz*/
+     real rd = (shape == "Sx" || shape == "Ux")? 0.:sqrt(square(xvor0)+square(yvor0));
+     func rzerox = (shape == "Sx" || shape == "Ux")? ((z<0 && shape == "Sx")? -1.:1) + tanh(curvature*(((z<0 && shape == "Sx")? 1.:-1.) +((z<0 && shape == "Ux")?-z:z)/vlength))/tanh(curvature) : rd;
+     func rzeroy = (shape == "Sy" || shape == "Uy")? ((z<0 && shape == "Sy")? -1.:1) + tanh(curvature*(((z<0 && shape == "Sy")? 1.:-1.) +((z<0 && shape == "Uy")?-z:z)/vlength))/tanh(curvature) : rd;
+     real rvortex = epsvor/4.;
+     func phi = arg(x-rzerox+1.i*(y-rzeroy));
+     func rxy = sqrt(square(x-rzerox)+square(y-rzeroy));
+     uvortex = sqrt(0.5*(1.+tanh((4./rvortex)*(rxy-rvortex))))*exp(1.i*phi);
+}// EOM
+
+macro  addARvortex(Th, Vh, un, Rmax,epsvor, narray, Nv, Rarr, Tharr, dRarr, dTharr)
+{
+  Vh<complex> uvortex;
+  real xvor, yvor;
+  if(narray==1 && Nv==1)
+    {/* add a single vortex */
+      xvor = Rarr*cos(Tharr);
+      yvor = Rarr*sin(Tharr); 
+      
+      cout <<"======vortex   xvor = "<< xvor <<"  yvor ="<< yvor <<endl;
+      fout <<"======vortex   xvor = "<< xvor <<"  yvor ="<< yvor <<endl;
+     
+   addvortex(Th, Vh, xvor, yvor, curvature, vlength, epsvor, uvortex);
+   un = un *uvortex;  
+                   
+    }
+  else
+    {/* add successive circles of vortices */
+
+      real Rcv, Tcv, thetav;
+      for(int iarray=0; iarray < narray; iarray++)  
+	{ Rcv = Rarr  + iarray*dRarr;  /* increment position radius*/
+          Tcv = Tharr + iarray*dTharr;   /* increment position theta */
+
+          if(Rcv > Rmax) break;
+
+	  Nv = Nv + iarray*Nv; /* trick to put more vortices on the next cercle*/        
+          cout<<"====== Nv ="<<Nv<<endl;
+          
+         for(int iv=0;iv < Nv;iv++)
+         { 
+           thetav = Tcv + (2*pi/Nv)*iv ;
+
+           xvor = Rcv*cos(thetav); 
+           yvor = Rcv*sin(thetav);
+           cout <<"=== Varray="<<iarray<<"  vortex "<<iv+1<<"   xvor = "<< xvor <<"  yvor ="<< yvor <<endl;
+           fout <<"=== Varray="<<iarray<<"  vortex "<<iv+1<<"   xvor = "<< xvor <<"  yvor ="<< yvor <<endl;
+     
+           addvortex(Th, Vh, xvor, yvor,curvature, vlength, epsvor, uvortex);
+           un = un *uvortex;                  
+          }
+       }
+    }
+}// EOM

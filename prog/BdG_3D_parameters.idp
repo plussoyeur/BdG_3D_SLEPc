@@ -1,0 +1,109 @@
+//===============================================================
+// parameters for BdG analysis
+//==============================================================
+int nbseg=8; //=5 is enough for mu=3, =8 for the others
+int nev = 30;        // number of eigenvectors
+real hmax=10./nbseg; // hmax for mesh adaptivity
+int qforder=10;      // quadrature rule for Newton rhs (necessary for fixed mesh)
+
+// Chemical potential 
+  real mu = 2;       // chemical potential
+       mu = getARGV("-mu",mu);
+  real deltamu = 0.1;
+       deltamu = getARGV("-deltamu",deltamu);
+  real mubefore = mu-deltamu;
+  real mustart = 2;
+       mustart = getARGV("-mustart",mustart);
+  real omadim=1;  // in 3D  this is  omega_z/omega_perp
+
+
+// To add vortices into the initial condition
+  string initi = "TF";
+  string ifDS="TF";  // TF or VS or RS (if Ipoptaxi then TF)
+  int narray =0 ;//number of successive cercle of vortices
+  int Nv =0; //number of vortices on the first array 
+  real Rarr = 0; //(*Rmax) the radius of the first cercle of vortices
+  real dRarr = 0; //(*Rmax) step for the radius
+  real Tharr = 0; //theta of the first cercle of vortices
+  real dTharr =0; //step for theta
+  string shape ="I"; //vortex shape (Ux, Uy, Sx, Sy or I)
+  real curvature = 10.; //vortex parameters
+  real vlength = 2.; //vortex parameters
+  real mod = 1; //winding number (charge of vortex)
+
+// Newton parameters
+  real EPS0 = 1.e-14; 
+  int ITERMAX=1000, iter;
+  real epsiter;
+
+
+// Scaling and non linear term
+  real Cg=1.;    // particular scaling
+  real ep=1.;    //  epsilon scaling AR
+
+// Coefficients of the trapping potential 
+  real ax = 1;
+  real ay = 1;
+  real az = omadim^2;
+  real a2 = 0;
+  real a4 = 0;
+
+// To build the mesh
+  string meshkind = "ellipsoid"; //ellipsoid or cylindre
+  real hminsurf = 0.7;
+  real hminvol = 0.4;
+
+//  rotating BEC
+  real Comega  = 0, Omop=0; 
+  real Comega2 = Comega*Comega;
+  complex liOm  = -li*Comega;
+  complex liOp  =  li*Comega;
+
+
+//====================================================
+// computes the Thomas-fermi approximation in 3D
+// to estimate the size of the computational domain
+//====================================================
+  real Rmax = sqrt(2*mu/ax);
+  real Rzmax = sqrt(2*mu/az);
+  real Rdom = 1.4*Rmax;
+  real Rzdom = 1.4*Rzmax;
+  real Rsmooth=0.95*Rmax;
+
+
+//====================================================
+// Physical quantities
+//====================================================
+  real energy = 0, energyLoc;
+  real lzcalc = 0, lzLoc;
+  real denscalc = 0, densLoc;
+  real mucalc = 0, muLoc;
+
+
+//===============================================================
+// Identify run case and set output directory and files
+//===============================================================
+   string dircase = "./Newton_3d_"+ifDS+"_"+shape+"_"+FEchoiceS+"_nbs_"+nbseg+"_mu_"+mu+"_omadim_"+omadim+"/";
+   string dirload = "./Newton_3d_"+ifDS+"_"+shape+"_"+FEchoiceS+"_nbs_"+nbseg+"_mu_"+mubefore+"_omadim_"+omadim+"/";
+
+
+   createDIR(dircase); //from A_bec_macro_3d
+
+   string scase = ifDS+"_"+shape+"_"+FEchoiceS+"_nbs_"+nbseg+"_mu_"+mu+"_omadim_"+omadim;
+   string scasebefore = ifDS+"_"+shape+"_"+FEchoiceS+"_nbs_"+nbseg+"_mu_"+mubefore+"_omadim_"+omadim;
+
+   //-----------file to store the echo of the main parameters
+     ofstream fout(dircase+"log_"+scase+".echo");
+     ofstream fenerg(dircase+scase+"_energ.dat"); // file for energy
+     ofstream fvalp(dircase+scase+"_eigenvalues.dat"); // file for eigenvalues
+
+  fenerg.precision(12);
+  fvalp.precision(12);
+  cout.precision(12);
+
+
+
+//===============================================================
+// echo main parameters
+//===============================================================
+  include "../A_macro_bec_3D/M_bec_BdG_3D_echo.edp";

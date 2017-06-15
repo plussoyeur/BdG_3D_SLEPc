@@ -1,0 +1,53 @@
+//===============================================================
+// macro computing rho0
+// for the Thomas-Fermi approximation
+// quartic +/- quadratic potential
+//===============================================================
+
+macro  feta(eta) ( Aeta*pow(eta,4) - square(1+square(eta))*acos(eta/sqrt(1+square(eta))) + pow(eta,3) + (5./3.)*eta)// EOM
+macro dfeta(eta) ( 4.*Aeta*pow(eta,3) - 4.*eta*(1+square(eta))*acos(eta/sqrt(1+square(eta))) + (1+square(eta)) + 3*pow(eta,2) + (5./3.))// EOM
+
+macro  computerhoQP2(rho0,Rout,Rzout,a2,a4,az,eps,Cg,Omop)
+{
+  /* takes into account the effective potential*/
+     real a2o = a2-Omop*Omop; 
+
+  /* parameters*/
+      real vscale = eps*eps*2.*Cg;
+      real Aeta = sqrt(az)*(4.*a4)^(5./2.)*vscale/(pi*pow(a2o,4));
+      real   xi   = sqrt(Aeta/pi);
+
+  /* different cases */
+  if( a2o == 0.)
+     {
+      rho0 = sqrt(4.*sqrt(az*a4))*sqrt(vscale)/pi;
+      Rout = (rho0/a4)^(1/4.);
+      Rzout = sqrt(rho0/az);
+     }
+
+  if(a2o>0) 
+     {cout<<"TF computing rho0:: quartic+quadratic potential"<<endl;        
+      real reta ;
+      IONEWTON(feta,dfeta,0., 200.,1.e-6,reta); 
+      rho0 = square(a2o)/(4.*a4*square(reta));
+      Rout = sqrt((-a2o + sqrt(square(a2o) + 4.*rho0*a4))/(2.*a4));
+      Rzout = sqrt(rho0/az);
+     }
+
+  if((a2o<0) && (xi<1.))
+     {cout<<"TF computing rho0:: quartic-quadratic potential with hole"<<endl;   
+      rho0 = square(a2o)*(xi-1.)/(4.*a4);
+      Rout = sqrt((-a2o + sqrt(square(a2o) + 4.*rho0*a4))/(2.*a4));
+      Rzout = sqrt((rho0/az) + square(a2o)/(4*a4*az));
+     }
+
+  if((a2o<0) && (xi>=1.))
+     {cout<<"TF computing rho0:: quartic-quadratic potential with depletion"<<endl;  
+      real reta ; real tt = -200.;
+      IONEWTON(feta,dfeta,tt,0.,1.e-6,reta); 
+      rho0 = square(a2o)/(4.*a4*square(reta));
+      Rout = sqrt((-a2o + sqrt(square(a2o) + 4.*rho0*a4))/(2.*a4));
+      Rzout = sqrt((rho0/az) + square(a2o)/(4*a4*az));
+     }
+
+}// EOM

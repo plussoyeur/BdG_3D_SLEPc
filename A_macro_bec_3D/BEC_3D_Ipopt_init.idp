@@ -1,0 +1,183 @@
+//===============================================================
+// Module using Ipopt in 3D to solve the GP equation without 
+// rotation in order to have an initial approximation
+//===============================================================
+
+
+
+//===============================================================
+// Optimizer tunning...
+//===============================================================
+// maxiter : initial max number of iteration (it will automatically be
+//           increased with the mesh quality)
+// tol     : optimization tolerance stopping criteria (see the FreeFem++
+//           documentation at the IPOPT Algorithm section)
+//===============================================================
+ 
+macro Grad(u) [dx(u),dy(u),dz(u)]//EOM
+
+//===============================================================
+// Gross Pitaevskii energy matrices buildup
+// GPm : sparse matrix of the quadratic part of the GP energy
+// dGPm : sparse matrix of the derivative of the quadratic part of GP energy
+// NWFm : sparse matrix of the wave function normalization constraint
+// dNWFm : derivate of constraint sparse matrix
+//===============================================================
+// withdirichlet : use homgenous dirichlet boundary condition
+//===============================================================
+
+bool withdirichlet = false;
+
+matrix GPm;
+matrix dGPm;
+matrix NWFm;
+
+varf GPvf([vr,vi],[ur,ui]) = 
+	int3d(Th)(scaleE*(  0.5*Grad(ur)'*Grad(vr) + 0.5*Grad(ui)'*Grad(vi) + Ctrapef*(ur*vr + ui*vi) ) ) ;
+varf dGPvf([vr,vi],[ur,ui]) = 
+	int3d(Th)(scaleE*(  Grad(ur)'*Grad(vr) + Grad(ui)'*Grad(vi) + 2*Ctrapef*(ur*vr + ui*vi) ) ) ;
+varf GPvfD([vr,vi],[ur,ui]) = 
+	int3d(Th)(scaleE*(  0.5*Grad(ur)'*Grad(vr) + 0.5*Grad(ui)'*Grad(vi) + Ctrapef*(ur*vr + ui*vi) ) )
+			  + on(1,vr=0,vi=0);
+varf dGPvfD([vr,vi],[ur,ui]) = 
+	int3d(Th)(scaleE*(  Grad(ur)'*Grad(vr) + Grad(ui)'*Grad(vi) + 2*Ctrapef*(ur*vr + ui*vi) ) )
+			  + on(1,vr=0,vi=0);
+varf NWFvf([vr,vi],[ur,ui]) = int3d(Th)(vr*ur + vi*ui);
+
+func int UpdateMatrices()
+{
+	if(withdirichlet)
+	{
+		GPm = GPvfD(Vh2,Vh2);
+		dGPm = dGPvfD(Vh2,Vh2);
+	}
+	else
+	{
+		GPm = GPvf(Vh2,Vh2);
+		dGPm = dGPvf(Vh2,Vh2);
+	}
+	NWFm = NWFvf(Vh2,Vh2);
+	return 0;
+}
+
+
+//===============================================================
+// Energy and constraint functional
+// Matrix returning routines return a global object because
+// returning a global sparse matrix which only exist in the function
+// local scope is not supported by the current version of FreeFem++
+//===============================================================
+// Egp 		: Gross-Pitaevskii energy
+// dEgp 	: G-P energy first variation
+// d2Lag 	: Hessian of the lagrangian functional
+// Hessian 	: the matrix returned by d2Lag
+// Norm 	: the normalization constraint
+// JacNorm 	: the normalization constraint derivative in matricial form (jacobian)
+// Jacobian : the matrix returned by Jacnorm
+// dNorm 	: the normalization constraint derivative in vectorial form (gradient)
+// ____Iter : evaluation counters for each functionnal
+//===============================================================
+
+func real Egp(real[int] &X)
+{
+	Vh2 [ar,ai];
+	ar[] = X;
+	real[int] MV = GPm*X;
+	real Ebili = X'*MV;
+	real E = Ebili + int3d(Th)(scaleE*(0.5*Cg*(ar^2+ai^2)^2));
+	return E;
+}
+
+func real[int] dEgp(real[int] &X)
+{
+	Vh2 [ar,ai];
+	ar[] = X;
+	varf vdj([vr,vi],[ur,ui]) = int3d(Th)(scaleE*(2*Cg*(ar*ur+ai*ui)*(ar^2+ai^2)));
+    real[int] dE = vdj(0,Vh2);
+    dE += dGPm * X;
+    return dE;
+}
+
+func real[int] Norm(real[int] &X)
+{
+	real[int] c(1);
+	real[int] tmp = NWFm * X;
+	c[0] = X'*tmp;
+	return c;
+}
+
+matrix Jacobian;
+func matrix JacNorm(real[int] &X)
+{
+	real[int,int] jacnorm(1,Vh2.ndof);
+	jacnorm(0,:) = NWFm * X;
+	jacnorm *= 2.;
+	Jacobian = jacnorm;
+	return Jacobian;
+}
+
+func real[int] dNorm(real[int] &X)
+{
+	real[int] dnorm = NWFm * X;
+	dnorm *= 2.;
+	return dnorm;
+}
+
+matrix Hessian;
+func matrix d2Lag(real[int] &X,real obj,real[int] &l)
+{//-----------file to store the echo of the main parameters
+   ofstream fout(fcase+".echo",append);
+	Vh2 [ar,ai];
+	ar[] = X;
+	varf vfhnqp([vr,vi],[ur,ui]) = 
+		int3d(Th)(scaleE*(2*Cg*(ar^2+ai^2)*(vr*ur+vi*ui) + 4*Cg*(ar*vr+ai*vi)*(ar*ur+ai*ui)));
+	matrix HEgp = vfhnqp(Vh2,Vh2);
+	HEgp = HEgp + dGPm;
+	Hessian = obj*HEgp + (2*l[0])*NWFm;
+	real egp,kktinfty;
+
+	return Hessian;
+}
+
+
+//===============================================================
+// Initialization of the minimization process
+//
+// [ur,ui] : the P1 condensate wave function (respectively
+//           real and imaginary part)
+// lambda  : is a one element array containing the Lagrange
+//           multiplier associated with the noramlization
+//           constraint
+//===============================================================
+
+cout << "Intialization..." << endl;
+UpdateMatrices();
+Vh2 [Ur,Ui] = [ur,ui];
+real[int] lambda=[1];
+real[int] cb = [1];
+int ipres;
+
+real cputime = clock();
+//===============================================================
+// The Optimization...
+//===============================================================
+
+
+for(int k=0;k<maerr.n;++k){
+	for(int kk=0;kk<niadapt;++kk){
+		int lvl = k*niadapt + kk;
+		
+		ipres = IPOPT(Egp,dEgp,d2Lag,Norm,JacNorm,Ur[],clb=cb,cub=cb,tol=EPS0 /*def. line 102*/,
+		                                       maxiter=IpoptMaxIter*(lvl+1) /*def. line 101*/,
+		                                       lm=lambda,warmstart=lvl);
+		if((k!=maerr.n-1 || kk!=niadapt-1) && ifRadapt){ 
+                        cout << "mesh adapt with error :: " << maerr[k] << endl;
+                        fout << "mesh adapt with error :: " << maerr[k] << endl;
+                        meshBECadapt(Th,Ur,Ui,ifRadapt,hminad,hmaxad,IWAIT,maerr[k],anisoadapt,memory); 
+			[Ur,Ui] = [Ur,Ui];
+			UpdateMatrices(); 
+		}
+	}
+
+}          
+un = Ur+ li *Ui;   

@@ -1,0 +1,613 @@
+//===============================================================
+//  Bogoliubov-de Gennes model for 3D problems 
+//  test for the single vortex
+// 
+//===============================================================  
+//  Newton method
+//  applied separately to the real and imaginary parts 
+//  version using the "varf" syntax to build matrices
+//*****  using P4 elements to represent non-linear terms
+//===============================================================   
+//  07 April 2016 
+//  25 Mai 2016  correct Newton coupling
+//  18 Mai 2017 Parallelisation
+//===============================================================
+
+   load "msh3";
+   load "tetgen";
+   load "mshmet";
+   load "mmg3d-v4.0";
+   load "aniso";
+   load "ff-Ipopt";
+   load "freeyams";
+
+
+//==============================================================
+// Parallel tools
+//==============================================================
+   load "PETSc-complex";
+   load "SLEPc-complex";
+
+   macro partitioner()metis// End Of Macro  // metis, scotch, or parmetis
+
+   macro dimension()3// EOM            // 2D or 3D
+   include "macro_ddm.idp";            // additional DDM functions
+   include "cube.idp";
+   include "getARGV.idp";
+
+   macro def(i)[i, i#B]// EOM          // scalar field definition
+   macro init(i)[i, i]// EOM           // scalar field initialization
+
+
+
+//===============================================================
+// general macros 
+//===============================================================
+
+  include "../A_macro/Macro_create_dir.edp";    // create directory
+
+  include "../A_macro_bec_3D/Macro_save_tecplot_3var.edp"; // saves tecplot file
+
+  include "../A_macro/func_iter_10000.edp"; // transforms an int in char
+  include "../A_macro/Macro_hmin_hmax.edp"; // hmin and hmax of the mesh 
+
+//===============================================================
+// BEC 3D
+// main macros defining the problem 
+//===============================================================
+
+  include "../A_macro_bec_3D/M_bec_amain_macro_PETSc.edp";
+
+//===============================================================
+// macro to  normalize the complex solution
+//===============================================================
+
+  include "../A_macro_bec_3D/M_bec_normalize.edp";
+
+//===============================================================
+// macro to make the mesh adaptation and to build the mesh
+//===============================================================
+
+  include "../A_macro_bec_3D/M_bec_maillage.edp";
+  include "../A_macro_bec_3D/M_bec_maillage_adapt.edp";
+
+//===============================================================
+// macro to restart the computation
+//===============================================================
+
+  include "../A_macro_bec_3D/M_bec_Mysavemesh.edp";     // saves restart file
+  include "../A_macro_bec/M_bec_restart_save.edp";     // saves restart file
+  include "../A_macro_bec/M_bec_restart_load.edp";     // load restart file
+
+//===============================================================
+// parameters
+//===============================================================
+//verbosity=1;
+
+int iwait=0;
+
+int nbseg=3; //=5 is enough for mu=3, =8 for the others
+int nev = 30;              // number of eigenvectors
+real hmax=10./nbseg; // hmax for mesh adaptivity
+int qforder=10;     // quadrature rule for Newton rhs (necessary for fixed mesh)
+
+
+macro  FEchoice   P2//
+func Pk = [P2, P2];
+string FEchoiceS="P2";
+
+
+int ifadaptmsh =0;   // Newton on a fixed mesh + adapt + Newton again
+int ifloadmsh =0;   // load restart on a fixed mesh (works only if adptmesh)
+int ifadaptmshinit =0;   // adapt the mesh of the initial condition
+
+if(ifadaptmsh==0)
+   ifloadmsh=0;
+
+// To add vortices into the initial condition
+     
+     string initi = "TF";
+     string ifDS="TF";  // TF or VS or RS (if Ipoptaxi then TF)
+     int narray =0 ;//number of successive cercle of vortices
+     int Nv =0; //number of vortices on the first array 
+     real Rarr = 0.; //(*Rmax) the radius of the first cercle of vortices
+     real dRarr = 0.; //(*Rmax) step for the radius
+     real Tharr = 0.; //theta of the first cercle of vortices
+     real dTharr = 0.; //step for theta
+     string shape ="I"; //vortex shape (Ux, Uy, Sx, Sy or I)
+     real curvature = 10.; //vortex parameters
+     real vlength = 2.; //vortex parameters
+     real mod = 1; //winding number (charge of vortex)
+
+
+     string smeth="Newton";
+     real EPS0 = 1.e-10; 
+     int ITERMAX=1000;
+     real dt=0.; // not needed for Newton
+
+     real mu = 2;       // chemical potential
+     mu = getARGV("-mu",mu);
+     real omadim=1;  // in 3D  this is  omega_z/omega_perp
+
+     real Cg=1.;    // particular scaling
+     real ep=1.;    //  epsilon scaling AR
+
+// Coefficients of the trapping potential
+    
+    real ax = 1;
+    real ay = 1;
+    real az = omadim^2;
+    real a2 = 0;
+    real a4 = 0;
+
+// To build the mesh
+
+    string meshkind = "ellipsoid"; //ellipsoid or cylindre
+    real hminsurf = 0.7;
+    real hminvol = 0.4;
+
+// parameters for mesh adaptation
+
+    real hminad = 0.001;
+    real hmaxad = 1.;
+    real erradapt = 0.01;
+    int anisoadapt = 10;
+    int prec = 25; 
+    int memory = 75;
+
+//  rotating BEC
+
+    real Comega  = 0, Omop=0; 
+    real Comega2 = Comega*Comega; 
+
+// Compute other variables
+//=============================================================== 
+
+    complex li   = 1i;
+    complex liOm  = -li*Comega;
+    complex liOp  =  li*Comega;
+
+//===============================================================
+// Identify run case and set output directory and files
+//===============================================================
+
+
+    string dircase = "./Newton_VB3d_"+ifDS+FEchoiceS+"_nbs_"+nbseg+"_mu_"+mu+"_omadim_"+omadim+"_adapt_"+ifadaptmsh+"_adaptI_"+ifadaptmshinit;
+    string dirload = "./Newton_VB3d_"+ifDS+FEchoiceS+"_nbs_"+nbseg+"_mu_"+mu+"_omadim_"+omadim+"_adapt_0/";
+
+    string scase   = ifDS+FEchoiceS+"_nbs_"+nbseg+"_mu_"+mu+"_omadim_"+omadim;
+
+    dircase = dircase+"/"; 
+    createDIR(dircase);
+
+// to create files
+    string fcase = dircase+scase;  
+
+//-----------file to store the echo of the main parameters
+
+  ofstream fout(dircase+"a_"+scase+".echo");
+  ofstream fenerg(fcase+"_energ.dat"); // fichier energie
+  ofstream fvalp(fcase+"_valp.dat"); // fichier energie
+
+  fenerg.precision(12);
+  fvalp.precision(12);
+  cout.precision(12);                    
+
+
+
+//====================================================
+// computes the Thomas-fermi approximation
+// to estimate the size of the computational domain
+//=============
+// 3D case
+//====================================================
+
+real Rmax = sqrt(2*mu/ax);
+real Rzmax = sqrt(2*mu/az);
+real Rdom = 1.4*Rmax;
+real Rzdom = 1.4*Rzmax;
+real Rsmooth=0.95*Rmax;
+
+//===============================================================
+// Mesh for 3D calculation
+//===============================================================
+
+real scalex=1., scalev=1.; /* to scale the data*/
+
+//===============================================================
+// Finite elements spaces and main FE functions
+// (the expressions are computed in "I_bec_compute_var_FE.edp"
+//
+//
+// Restrict mesh per proc
+//===============================================================
+int[int, int] LL = [[2,2], [1,1], [1,1]];
+real[int, int] BB = [[0,1], [0,1], [0,1]];
+int[int] CC = [1, 1, 1];
+mesh3 Th = Cube(CC, BB, LL);
+
+fespace VhP1(Th,P1);
+fespace Vh(Th,FEchoice);
+fespace Vhvec(Th,[FEchoice,FEchoice]);          // vector finite-element space
+
+int[int] arrayIntersection;                 // ranks of neighboring subdomains
+int[int][int] restrictionIntersection(0);   // local-to-neighbors renumbering
+real[int] D;                                // partition of unity
+
+VhP1 Dh;
+Vh Dhh;
+
+mesh3 ThGlob;
+
+ThGlob= Buildmesh(meshkind,Rdom,Rdom,Rzdom,nbseg,hminsurf,hminvol);
+
+{
+  mesh3 ThBorder;
+  mesh3 Thtmp = ThGlob; 
+  build(Th, ThBorder, Thtmp, 10, 1, 1, D, arrayIntersection, restrictionIntersection, Vhvec, Pk, mpiCommWorld, false)
+} 
+
+
+
+fespace Vhtot(ThGlob,FEchoice);
+fespace Vhvectot(ThGlob,[FEchoice,FEchoice]);          // vector finite-element space
+
+
+ 
+//===============================================================
+// echo main parameters
+//===============================================================
+
+include "../A_macro_bec_3D/M_bec_BdG_3D_echo.edp";
+
+//===============================================================
+// necessary functions
+//===============================================================
+
+Vh   rr2     = x*x+ y*y;
+Vh   rr      = sqrt(rr2);
+Vh   Vbar    = ax*x*x+ay*y*y+az*z*z+a4*rr2*rr2;   /* trapping potential */
+Vh   Ctrap   = 0.5*Vbar/(ep*ep);          /* Ctrap function --> 1/2 factor */
+Vh   Vbaref  = Vbar-Omop*Omop*rr2;         /* effective trapping potential */
+Vh   Ctrapef = 0.5*Vbaref/(ep*ep);         /* effective trapping potential */
+
+Vh rhoTF   =(mu-Ctrap>0)?(mu-Ctrap):0. ;         // atomic density Thomas-Fermi
+Vh rhoTFef=(mu-Ctrapef>0)?(mu-Ctrapef):0. ;   // atomic density Thomas-Fermi
+
+//===============================================================
+// variational formulation and matrices :: attention, Dirichlet BC only on 2 and 4
+//===============================================================
+   
+   Vh<complex> un,unconj;
+   Vh<complex> unrc = 0, unic = 0;
+   Vh unr,uni, unmod2,umod;
+   Vhtot<complex> untot,untottmp;
+
+//===============================================================
+// init by TF or dark-soliton
+//===============================================================
+
+int iter=0; real energy, energold=1, lzcalc=0,lzold=1,denscalc=1,mucalc=0;
+real epsiter=10,epsiteru=10,epsiterv=10;
+
+   if(ifloadmsh)
+     {  int ITER0;
+        restartload(un,dirload+scase+"_fin.rst",ITER0); 
+        if(mpirank ==0) cout <<"============  Field loaded from :: "<< scase+".mesh"<<endl;
+	if(mpirank ==0) fout <<"============  Field loaded from :: "<< scase+".mesh"<<endl;
+
+     }
+   else
+     {
+       if (initi == "Ipoptaxi") {include "../A_macro_bec_3D/BEC_3D_Ipoptaxi_init.idp";}  /*initialize u^n from Ipot axisymmetric*/
+       if (initi == "TF") {unr = (rr>0)?sqrt(rhoTF):0; uni = 0.;} /* initialize u^n from TF*/
+
+      //unr =unr*fsmooth(rr,Rsmooth);
+
+
+      if(ifDS=="TF")// add the vortex 
+       {  include "../A_macro_bec_3D/M_bec_addvortices.edp";
+          real epsvor = 1./pow(2.*Cg,0.25); // size of a vortex 
+          Rarr   = Rarr*Rmax;
+          dRarr  = dRarr*Rmax;
+          un =unr + li*uni;
+          addARvortex(Th, Vh, un, Rmax, epsvor, narray, Nv, Rarr, Tharr, dRarr, dTharr);
+          unr = real(un);
+          uni = imag(un);
+
+       }
+
+       if(ifDS=="RS")// add the ring 
+       {
+	 real Rring = sqrt(mu/(2*omadim^2));
+	 //unr = sqrt(rhoTF)*tanh(sqrt(mu)*(rr-Rring));  
+         unr = (omadim*rr2-1)*exp(-omadim*rr2/2);
+	 uni = 0;
+	 
+	 //unr =unr*fsmooth(rr,Rsmooth);
+	 //uni =uni*fsmooth(rr,Rsmooth);
+         if(mpirank ==0) cout<<"============================== TF + vortex state"<<endl;
+	 if(mpirank ==0) fout<<"============================== TF + vortex state"<<endl;
+       }
+ 
+          un =unr + li*uni;  
+     }
+
+      if(ifadaptmshinit)
+       {
+	
+          meshBECadapt(Th,unr,uni,ifadaptmshinit,hminad,hmaxad,iwait,erradapt,anisoadapt,memory);
+
+
+            /* rebuild  matrices and functions */
+
+            unr =unr;
+	    uni =uni;
+
+            rr2     = x*x+ y*y;
+            rr      = sqrt(rr2);
+            Vbar    = ax*x*x+ay*y*y+az*z*z+a4*rr2*rr2;   /* trapping potential */
+            Ctrap   = 0.5*Vbar/(ep*ep);          /* Ctrap function --> 1/2 factor */
+            Vbaref  = Vbar-Omop*Omop*rr2;         /* effective trapping potential */
+            Ctrapef = 0.5*Vbaref/(ep*ep);         /* effective trapping potential */
+
+            rhoTF  =(mu-Ctrap>0)?(mu-Ctrap):0. ;         /* atomic density Thomas-Fermi*/
+            rhoTFef=(mu-Ctrapef>0)?(mu-Ctrapef):0. ;   /* atomic density Thomas-Fermi*/
+
+            un =unr + li*uni;  
+	    unconj =conj(un);
+       }
+
+  
+     unconj=conj(un);
+
+     energy = 0;
+     real energyLoc =  energ(Th,un,unconj);
+     mpiAllReduce(energyLoc,energy,mpiCommWorld, mpiSUM);
+
+     lzcalc = 0;
+     real lzLoc     =  Lzi(Th,un,unconj);
+     mpiAllReduce(lzLoc,lzcalc,mpiCommWorld, mpiSUM);
+
+     denscalc = 0;
+     real densLoc   = density(Th,un);
+     mpiAllReduce(densLoc,denscalc,mpiCommWorld, mpiSUM);
+
+     mucalc = 0;
+     real muLoc     = chempot(Th,un,unconj);
+     mpiAllReduce(muLoc,mucalc,mpiCommWorld, mpiSUM);
+     mucalc = mucalc/denscalc;
+
+
+
+     fenerg <<"ZONE T=0"<<endl;
+     fenerg << iter <<"  "<< energy <<"  "<< lzcalc <<"  "<< denscalc <<"  "<< mucalc <<endl;
+
+     if(mpirank ==0)  cout << "iter="<<iter<<" epsiteru = " << epsiteru<<" epsiterv = " << epsiterv 
+                          <<" energy   ="  << energy
+                          <<"     Lz   ="  << lzcalc
+                          <<" density  ="  << denscalc  
+                          <<"     mu   ="  << mucalc <<endl;
+
+     if(mpirank ==0)  fout << "iter="<<iter<<" epsiteru = " << epsiteru<<" epsiterv = " << epsiterv 
+                          <<" energy   ="  << energy
+                          <<"     Lz   ="  << lzcalc
+                          <<" density  ="  << denscalc  
+                          <<"     mu   ="  << mucalc <<endl;
+
+if(mpirank ==0)  cout<<" ========= theoretical density="<< 8.*pi*pow(mu,5./2.)/15./sqrt(ax*ay*az/8.)<<endl;
+if(mpirank ==0)  cout<<" ========= calculated  density="<< denscalc <<endl;
+                          
+plot(unr,cmm="(real u) initial condition",wait=iwait,value=1,fill=1,dim=3);
+plot(uni,cmm="(imag u) initial condition",wait=iwait,value=1,fill=1,dim=3); 
+
+umod = (unr*unr+uni*uni);
+
+//medit("initial u",Th,umod,wait=iwait,order=1);
+string siter =funciter(iter); 
+string zname="iter"+siter;
+
+
+//===============================================================
+// build useful matrices :: done directly in Newton
+// since they depend on the mesh
+//===============================================================
+
+
+//===============================================================
+// prepare iterations
+//===============================================================
+
+   
+real cputime = mpiWtime(), cputime2;
+
+//===============================================================
+// Newton iterations loop
+//===============================================================
+
+include "../A_macro_bec_3D/M_bec_Newton_fixmu_3D_PETSc-complex.edp";
+
+if(mpirank ==0)  cout << "========== Begin Newton ==========" << endl;
+for(int ipass=0;ipass<=ifadaptmsh;ipass++)
+  {
+    iter=0;
+    Newtonfixmu3d(iter,EPS0,ITERMAX,ipass);
+
+
+     un =unr + li*uni;   
+     unconj=conj(un);
+
+     energy = 0;
+    energyLoc =  energ(Th,un,unconj);
+    mpiAllReduce(energyLoc,energy,mpiCommWorld, mpiSUM);
+
+    lzcalc = 0;
+    lzLoc     =  Lzi(Th,un,unconj);
+    mpiAllReduce(lzLoc,lzcalc,mpiCommWorld, mpiSUM);
+
+    denscalc = 0;
+    densLoc   = density(Th,un);
+    mpiAllReduce(densLoc,denscalc,mpiCommWorld, mpiSUM);
+
+    mucalc = 0;
+    muLoc     = chempot(Th,un,unconj)/denscalc;
+    mpiAllReduce(muLoc,mucalc,mpiCommWorld, mpiSUM);
+
+    if(mpirank==0){
+      fenerg << iter <<"  "<< energy <<"  "<< lzcalc <<"  "<< denscalc <<"  "<< mucalc <<endl;
+
+      cout << "Newton pass= "<<ipass<<" iter="<<iter<<" energy   ="  << energy
+	   <<"     Lz   ="  << lzcalc
+	   <<" density  ="  << denscalc  
+	   <<"     mu   ="  << mucalc <<endl;
+
+      fout  << "Newton pass= "<<ipass<<" iter="<<iter<<" energy   ="  << energy
+	    <<"     Lz   ="  << lzcalc
+	    <<" density  ="  << denscalc  
+	    <<"     mu   ="  << mucalc <<endl;
+    }
+  }
+
+
+cputime = mpiWtime()-cputime;
+mpiReduce(cputime,cputime2,processor(0),mpiMAX);
+if(mpirank ==0)  cout<<"==================> CPU time steady:: "<<cputime2<<endl;
+if(mpirank ==0)  fout<<"==================> CPU time steady:: "<<cputime2<<endl;
+cputime = mpiWtime();
+
+
+// Dhh =Dh;
+// cout << mpirank << "Dhh size : " << Dhh[].n << " un size : " << un[].n << endl;
+
+
+// un[].re = Dhh[].*(un[].re);
+// un[].im = Dhh[].*(un[].im);
+
+// matrix<complex> R;
+// matrix tmpR = interpolate(Vh,Vhtot);
+// R = tmpR;
+// cout << mpirank << " Th size : " << ThGlob.nv << endl;
+// cout << mpirank << " r.n : " << R.n << " r.m : " << R.m << endl;
+// cout << mpirank << " Vh size : " << Vh.ndof << "  " << Vhtot.ndof  << endl;
+
+// untottmp[] = R'*un[];
+// untot[] = 0;
+// cout << mpirank << " utot size : " << untottmp[].n << endl;
+// mpiAllReduce(untottmp[],untot[],mpiCommWorld,mpiSUM);
+
+// cout << mpirank << " utot size : " << untot[].n << endl;
+
+
+mpiBarrier(mpiCommWorld);
+
+//===============================================================
+// Compute eigenvalue problem
+//===============================================================
+if(mpirank ==0)  cout << "========== Begin Bdg ==========" << endl;
+//ThGlob = change(ThGlob,fregion=nuTriangle*mpisize/(ThGlob.nt));
+
+// complex[int] evp(nev);   // will store the eigenvalues
+
+
+
+// Vhvectot<complex>[int] [eV1,eV2](nev);  // will store the eigenvectors
+complex[int]     EigenVAL(0);       // array to store eigenvalues
+Vhvec<complex>[int] [eV1,eV2](nev);  // array to store eigenvectors
+eV1[0][] = 0.0;
+
+
+// bilinear and linear forms
+//===============================================================
+
+int n = Vhvectot.ndof;
+Vhvectot<complex> [aB,bB],[v1,v2];
+complex sigma =0.;   // shift
+
+// Th already modified in the Newton algorithm (assigned region per proc)
+
+varf  aV1([aB,bB],[v1,v2])=
+   int3d(Th)( 0.5*(dx(aB)*dx(v1) + dy(aB)*dy(v1) + dz(aB)*dz(v1)) + Ctrap*aB*v1 + 2*Cg*un2(un)*aB*v1 - mu*aB*v1)
+  +int3d(Th)(-0.5*(dx(bB)*dx(v2) + dy(bB)*dy(v2) + dz(bB)*dz(v2)) - Ctrap*bB*v2 - 2*Cg*un2(un)*bB*v2 + mu*bB*v2)
+  +int3d(Th)(Cg*un*un*bB*v1 - Cg*conj(un)*conj(un)*aB*v2)
+  -int3d(Th)(sigma* aB*v1 + sigma* bB*v2) 
+		    + on(0,aB=0) +  on(0,bB=0) ;  // Boundary condition
+                   
+varf bV1([aB,bB],[v1,v2]) = int3d(Th)(aB*v1+bB*v2); // no  Boundary condition
+
+
+matrix<complex> A= aV1(Vhvec,Vhvec);
+matrix<complex> B= bV1(Vhvec,Vhvec);
+
+dmatrix<complex> DistA(A, arrayIntersection, restrictionIntersection, D, clean = true);
+dmatrix<complex> DistB(DistA, B, clean = true);
+
+// string ssparams =            // Parameters for the distributed EigenValue solver
+//   " -eps_nev " + nev       + // Number of eigenvalues
+//   " -eps_type krylovschur" +
+//   " -st_type sinvert "     +
+//   " -st_pc_type lu "       +
+//   " -st_pc_factor_mat_solver_package mumps" +
+//   " -eps_view"             +
+//   " -eps_pos_gen_non_hermitian"      // The problem is symmetric
+//   ;
+
+string ssparams =            // Parameters for the distributed EigenValue solver
+  " -eps_nev " + nev       + // Number of eigenvalues
+  " -eps_type krylovschur" +
+  " -eps_target 0.01" +
+  " -st_type sinvert "     +
+  " -st_pc_type lu "       +
+  " -st_pc_factor_mat_solver_package mumps" +
+  " -eps_view"             +
+  " -eps_pos_gen_non_hermitian"      // The problem is symmetric
+  ;
+
+
+int k = zeigensolver
+(DistA,              // matrix OP = A − sigma*B
+ DistB,              //
+ vectors = eV1, // Array to store the FEM-EigenFunctions
+ values  = EigenVAL, // Array to store the EigenValues
+ sparams = ssparams  // Parameters for the distributed EigenValue solver
+);
+
+k=min(k,nev); // some time the number of converged eigen value
+              // can be greater than nev;
+/***************************************/
+/*           View the solution         */
+/***************************************/
+Vhvec<complex> [Temp,Temp2];
+
+for(int i=0;i<k;i++){
+    if(!mpirank) cout << " Eigenvalue #"+i+" = "+EigenVAL[i]<<endl;
+    // Temp = eV1[i];
+    // plotMPI(Th,     // The local mesh
+    //         Temp[], // The local solution
+    //         "Psi("+i+")  EV = "+EigenVAL[i], // Comment
+    //         Pk,     // Local FE-space
+    //         def,    // Macro for field definition
+    //         complex,// Type
+    //         3,      // 2d/3d view
+    //         1       // Wait
+    //        )
+}
+
+
+
+
+
+
+
+
+
+//===============================================================
+// display CPU time
+//===============================================================
+
+cputime = mpiWtime()-cputime;
+mpiReduce(cputime,cputime2,processor(0),mpiMAX);
+if(mpirank ==0) cout<<"==================> CPU time ARPACK:: "<< cputime2<<endl;
+if(mpirank ==0) fout<<"==================> CPU time ARPACK:: "<< cputime2<<endl;
+
+
+

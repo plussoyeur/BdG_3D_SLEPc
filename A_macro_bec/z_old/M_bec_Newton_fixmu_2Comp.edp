@@ -1,0 +1,259 @@
+/*  this is an old and slightly buggy version : 
+the Jacobian in Newton is diagonal */
+
+macro  Newtonfixmu2C(iter,EPS0,ITERMAX,ITERPLOT,ipass,Menergy,MLz,Mdensity,Mchempot1,Mchempot2)
+{
+iter=0; 
+ epsiter=10;epsiteru1=10;epsiterv1=10;epsiteru2=10;epsiterv2=10;
+
+ fespace Vh4(Th,P4,periodic=[[1,x],[3,x]]);
+Vh u,v;
+
+Vh4 u4;
+
+varf  Vgrad(u,v)= int2d(Th)( 0.5*(dx(u)*dx(v)+dy(u)*dy(v)));
+varf  Vomega(u,v)= int2d(Th)(Comega*lzd(u)*v);
+varf  Vmass(u,v)= int2d(Th)(u*v);
+varf  Vmass4(u4,v)= int2d(Th)(u4*v);
+
+ varf  Vsys1Ur(u,v)= int2d(Th)( 0.5*(dx(u)*dx(v)+dy(u)*dy(v)) + Ctrap*u*v
+			       + (beta11*(3*Psi1r^2 + Psi1i^2) + beta12*(Psi2r^2 + Psi2i^2))*u*v
+			       - mu1*u*v)
+   + on(2,4,u=1);
+
+varf  Vsys1Ui(u,v)= int2d(Th)( 0.5*(dx(u)*dx(v)+dy(u)*dy(v)) + Ctrap*u*v
+			       + (beta11*(Psi1r^2 + 3*Psi1i^2) + beta12*(Psi2r^2 + Psi2i^2))*u*v
+			       - mu1*u*v)
+   + on(2,4,u=1);
+
+varf  Vsys2Ur(u,v)= int2d(Th)( 0.5*(dx(u)*dx(v)+dy(u)*dy(v)) + Ctrap*u*v
+			       + (beta22*(3*Psi2r^2 + Psi2i^2) + beta21*(Psi1r^2 + Psi1i^2))*u*v
+			       - mu2*u*v)
+   + on(2,4,u=1);
+
+varf  Vsys2Ui(u,v)= int2d(Th)( 0.5*(dx(u)*dx(v)+dy(u)*dy(v)) + Ctrap*u*v
+			       + (beta22*(Psi2r^2 + 3*Psi2i^2) + beta21*(Psi1r^2 + Psi1i^2))*u*v
+			       - mu2*u*v)
+   + on(2,4,u=1);
+
+
+varf  Vbc(u,v) = on(2,4,u=1);  
+
+
+matrix Agrad   =  Vgrad (Vh, Vh);
+matrix AMass   =  Vmass (Vh, Vh);
+matrix Aomega  =  Vomega(Vh, Vh);
+matrix AMass4  =  Vmass4(Vh4,Vh);
+
+Vh  BC;    
+BC[] = Vbc(0,Vh,tgv=1); 
+BC[] = -BC[]; 
+BC[] += 1;
+
+
+matrix Asys1Ur=Vsys1Ur(Vh,Vh);
+matrix Asys1Ui=Vsys1Ui(Vh,Vh);
+
+matrix Asys2Ur=Vsys2Ur(Vh,Vh);
+matrix Asys2Ui=Vsys2Ui(Vh,Vh);
+
+
+
+ 
+/* some optmizations*/
+
+ Vh4  HnewR1, HnewI1, HnewR2, HnewI2, Hnon1, Hnon2;
+
+  while(epsiter > EPS0 && iter < ITERMAX)
+ {
+  
+  iter++; 
+  
+  /* non-linear terms treated within P4*/
+
+       Hnon1        =  beta11*(Psi1r^2+Psi1i^2)+beta12*(Psi2r^2+Psi2i^2) ;
+       HnewR1       =  (Ctrap-mu1)*Psi1r + Hnon1*Psi1r ;
+       HnewI1       =  (Ctrap-mu1)*Psi1i + Hnon1*Psi1i ;
+
+       Hnon2        =  beta21*(Psi1r^2+Psi1i^2)+beta22*(Psi2r^2+Psi2i^2) ;
+       HnewR2       =  (Ctrap-mu2)*Psi2r + Hnon2*Psi2r ;
+       HnewI2       =  (Ctrap-mu2)*Psi2i + Hnon2*Psi2i ;
+
+            
+       /* rhs terms*/
+     
+     
+       real[int]     /*brhsR1  = Aomega*Psi1i[];*/
+                     brhsR1  = Agrad *Psi1r[];
+                     brhsR1 += AMass4*HnewR1[];
+
+                  
+       real[int]     /*brhsI1  = Aomega*Psi1r[];
+		       brhsI1 *= (-1);*/
+                     brhsI1  = Agrad *Psi1i[];
+                     brhsI1 += AMass4*HnewI1[];
+
+
+       real[int]     /*brhsR2  = Aomega*Psi2i[];*/
+                     brhsR2  = Agrad *Psi2r[];
+                     brhsR2 += AMass4*HnewR2[];
+
+                  
+       real[int]     /*brhsI2  = Aomega*Psi2r[];
+		       brhsI2 *= (-1);*/
+                     brhsI2  = Agrad *Psi2i[];
+                     brhsI2 += AMass4*HnewI2[];
+
+    
+
+		     /* reinforce boundary condition u=0 on the border */    
+		     brhsR1 .*= BC[];     
+		     brhsI1 .*= BC[];
+		     
+		     brhsR2 .*= BC[];     
+		     brhsI2 .*= BC[];    
+
+		     /* matrices of the system*/
+
+		     Asys1Ur=Vsys1Ur(Vh,Vh);
+		     Asys1Ui=Vsys1Ui(Vh,Vh);
+		     
+		     Asys2Ur=Vsys2Ur(Vh,Vh);
+		     Asys2Ui=Vsys2Ui(Vh,Vh);
+
+		set(Asys1Ur,solver=UMFPACK);
+		set(Asys1Ui,solver=UMFPACK);
+		
+ 		set(Asys2Ur,solver=UMFPACK);
+		set(Asys2Ui,solver=UMFPACK);
+
+     
+		/* advance the solution; solve linear systems*/
+     
+		u1r[] = Asys1Ur^-1*brhsR1;
+                u1i[] = Asys1Ui^-1*brhsI1;
+		
+		u2r[] = Asys2Ur^-1*brhsR2;
+                u2i[] = Asys2Ui^-1*brhsI2;
+
+     
+		/* update the solution*/
+           
+      Psi1r[] = Psi1r[] - u1r[];    
+      Psi1i[] = Psi1i[] - u1i[];
+      
+      Psi2r[] = Psi2r[] - u2r[];    
+      Psi2i[] = Psi2i[] - u2i[];
+      
+
+      epsiteru1 = u1r[].linfty;
+      epsiterv1 = u1i[].linfty;
+      
+      epsiteru2 = u2r[].linfty;
+      epsiterv2 = u2i[].linfty;
+      
+      /*epsiter=max(max(epsiteru1,epsiterv1),max(epsiteru2,epsiterv2));*/
+
+     Psi1 =Psi1r + li*Psi1i;   
+     Psi1conj=conj(Psi1);
+
+     Psi2 =Psi2r + li*Psi2i;   
+     Psi2conj=conj(Psi2);
+     
+   
+     energy =   Menergy(Th,Psi1,Psi1conj,Psi2,Psi2conj); 
+     lzcalc=        MLz(Th,Psi1,Psi1conj,Psi2,Psi2conj);
+     denscalc1 = Mdensity(Th,Psi1);
+     denscalc2 = Mdensity(Th,Psi2);
+     mucalc1   = Mchempot1(Th,Psi1,Psi1conj,Psi2,Psi2conj)/denscalc1;
+     mucalc2   = Mchempot2(Th,Psi1,Psi1conj,Psi2,Psi2conj)/denscalc2;
+
+     fenerg << iter <<"  "<< energy <<"  "<< lzcalc <<"  "
+                    << denscalc1 <<"  "<< mucalc1<<"  "<< denscalc2 <<"  "<< mucalc2 <<endl;
+
+     cout << "iter="<<iter<<" energy  ="  << energy     <<"     Lz  ="  << lzcalc<<endl;
+     cout << "iter="<<iter<<" density1 ="  << denscalc1  <<"     mu1  ="  << mucalc1
+                          <<" epsiteru1 = " << epsiteru1<<" epsiterv1 = " << epsiterv1<<endl;
+     cout << "iter="<<iter<<" density2 ="  << denscalc2  <<"     mu2  ="  << mucalc2
+                          <<" epsiteru2 = " << epsiteru2<<" epsiterv2 = " << epsiterv2<<endl;
+
+     fout << "iter="<<iter<<" energy  ="  << energy     <<"     Lz  ="  << lzcalc<<endl;
+     fout << "iter="<<iter<<" density1 ="  << denscalc1  <<"     mu1  ="  << mucalc1
+                          <<" epsiteru1 = " << epsiteru1<<" epsiterv1 = " << epsiterv1<<endl;
+     fout << "iter="<<iter<<" density2 ="  << denscalc2  <<"     mu2  ="  << mucalc2
+                          <<" epsiteru2 = " << epsiteru2<<" epsiterv2 = " << epsiterv2<<endl;
+
+     epsiteru1 = abs(energold)>0?abs(energy-energold)/energold:abs(energy-energold);
+     epsiterv1 = abs(lzold)>0 ?abs(lzcalc-lzold)/lzold:abs(lzcalc-lzold);
+     epsiter  = max(epsiteru1,epsiterv1);
+
+     cout << "iter="<<iter<<"=====  epsiter(energ,lz)="<<epsiter<<endl;
+     fout << "iter="<<iter<<"=====  epsiter(energ,lz)="<<epsiter<<endl;
+     
+     energold=energy;
+     lzold=lzcalc;
+     
+              if(iter%ITERPLOT == 0)
+   {
+     plot(Psi1r,cmm="(real u1) iter="+iter,wait=iwait,value=1,fill=1,dim=3);
+     plot(Psi1i,cmm="(imag u1) iter="+iter,wait=iwait,value=1,fill=1,dim=3); 
+     plot(Psi2r,cmm="(real u2) iter="+iter,wait=iwait,value=1,fill=1,dim=3);
+     plot(Psi2i,cmm="(imag u2) iter="+iter,wait=iwait,value=1,fill=1,dim=3); 
+
+     Psi1mod = sqrt(un2(Psi1));
+     Psi2mod = sqrt(un2(Psi2));
+
+
+     siter =funciter(iter);
+     zname="iter"+siter;
+     
+     savetecplot3(Th,Vh,fcase+"_pass_"+ipass+"_iter_"+siter+"_psi1.dat",Psi1r,Psi1i,Psi1mod,"Ur","Ui","Umod",zname);
+     extractDlignescale(Th,Vh,Psi1mod,xl1,yl1,xl2,yl2,npplot,fcase+"_pass_"+ipass+"_iter_"+siter+"_1Dx_m_psi1.dat","Umod",zname,scalex,scalev);
+     extractDlignescale(Th,Vh,Psi1r ,xl1,yl1,xl2,yl2,npplot,fcase+"_pass_"+ipass+"_iter_"+siter+"_1Dx_r_psi1.dat","Ur",zname,scalex,scalev);
+     extractDlignescale(Th,Vh,Psi1i ,xl1,yl1,xl2,yl2,npplot,fcase+"_pass_"+ipass+"_iter_"+siter+"_1Dx_i_psi1.dat","Ui",zname,scalex,scalev);
+     
+
+      savetecplot3(Th,Vh,fcase+"_pass_"+ipass+"_iter_"+siter+"_psi2.dat",Psi2r,Psi2i,Psi2mod,"Ur","Ui","Umod",zname);
+     extractDlignescale(Th,Vh,Psi2mod,xl1,yl1,xl2,yl2,npplot,fcase+"_pass_"+ipass+"_iter_"+siter+"_1Dx_m_psi2.dat","Umod",zname,scalex,scalev);
+     extractDlignescale(Th,Vh,Psi2r ,xl1,yl1,xl2,yl2,npplot,fcase+"_pass_"+ipass+"_iter_"+siter+"_1Dx_r_psi2.dat","Ur",zname,scalex,scalev);
+     extractDlignescale(Th,Vh,Psi2i ,xl1,yl1,xl2,yl2,npplot,fcase+"_pass_"+ipass+"_iter_"+siter+"_1Dx_i_psi2.dat","Ui",zname,scalex,scalev);
+   
+    
+
+   }
+
+                                                      
+ } /* end Newton loop*/
+
+/* saves Tecplot (final) files*/ 
+
+     Psi1 =Psi1r + li*Psi1i;   
+     Psi1conj=conj(Psi1);
+     Psi2 =Psi2r + li*Psi2i;   
+     Psi2conj=conj(Psi2);
+     
+  
+     plot(Psi1r,cmm="(real u1) iteration final="+iter,value=1,fill=1,dim=3,wait=iwait);
+     plot(Psi1i,cmm="(imag u1) iteration final="+iter,value=1,fill=1,dim=3,wait=iwait);
+     plot(Psi2r,cmm="(real u2) iteration final="+iter,value=1,fill=1,dim=3,wait=iwait);
+     plot(Psi2i,cmm="(imag u2) iteration final="+iter,value=1,fill=1,dim=3,wait=iwait);
+
+     Psi1mod = sqrt(Psi1r*Psi1r+Psi1i*Psi1i);
+     Psi2mod = sqrt(Psi2r*Psi2r+Psi2i*Psi2i);
+
+     siter =funciter(iter);
+     zname="iter"+siter;
+
+     savetecplot3(Th,Vh,fcase+"_pass_"+ipass+"_iter_"+siter+"_psi1-fin.dat",Psi1r,Psi1i,Psi1mod,"Ur","Ui","Umod",zname);
+     extractDlignescale(Th,Vh,Psi1mod,xl1,yl1,xl2,yl2,npplot,fcase+"_pass_"+ipass+"_iter_"+siter+"_1Dx_m_psi1-fin.dat","Umod",zname,scalex,scalev);
+     extractDlignescale(Th,Vh,Psi1r ,xl1,yl1,xl2,yl2,npplot,fcase+"_pass_"+ipass+"_iter_"+siter+"_1Dx_r_psi1-fin.dat","Ur",zname,scalex,scalev);
+     extractDlignescale(Th,Vh,Psi1i ,xl1,yl1,xl2,yl2,npplot,fcase+"_pass_"+ipass+"_iter_"+siter+"_1Dx_i_psi1-fin.dat","Ui",zname,scalex,scalev);
+     
+
+     savetecplot3(Th,Vh,fcase+"_pass_"+ipass+"_iter_"+siter+"_psi2-fin.dat",Psi2r,Psi2i,Psi2mod,"Ur","Ui","Umod",zname);
+     extractDlignescale(Th,Vh,Psi2mod,xl1,yl1,xl2,yl2,npplot,fcase+"_pass_"+ipass+"_iter_"+siter+"_1Dx_m_psi2-fin.dat","Umod",zname,scalex,scalev);
+     extractDlignescale(Th,Vh,Psi2r ,xl1,yl1,xl2,yl2,npplot,fcase+"_pass_"+ipass+"_iter_"+siter+"_1Dx_r_psi2-fin.dat","Ur",zname,scalex,scalev);
+     extractDlignescale(Th,Vh,Psi2i ,xl1,yl1,xl2,yl2,npplot,fcase+"_pass_"+ipass+"_iter_"+siter+"_1Dx_i_psi2-fin.dat","Ui",zname,scalex,scalev);
+ 
+}
+//EOM

@@ -1,0 +1,39 @@
+//===============================================================
+// load solution for restart only
+//===============================================================
+
+macro  restartload(u,namef,niter)
+{
+{
+      ifstream ftec(namef);
+      ftec>> niter;
+      ftec>> u[];
+
+
+cout<<" +++++++++ load_restart_file  :: fichier "<<namef<<endl;
+}
+}// EOM
+
+
+
+//===============================================================
+// read solution from restart with an old mesh
+//===============================================================
+
+macro  restartloadint(unew,namefbase,niter)
+{
+{
+      mesh Thint(namefbase+".msh");
+      fespace Vhint(Thint,P1);
+      Vhint<complex> uint;
+       
+      {ifstream ftec(namefbase+".rst");
+      ftec>> niter;
+      ftec>> uint[];}
+      
+      unew = uint;
+      
+cout<<" +++++++++ read_restart_file  :: fichier mesh"<<namefbase+".msh"<<endl;
+cout<<" +++++++++ read_restart_file  :: fichier  sol"<<namefbase+".rst"<<endl;
+}
+}// EOM

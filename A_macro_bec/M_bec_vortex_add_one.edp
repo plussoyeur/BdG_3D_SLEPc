@@ -1,0 +1,19 @@
+//===============================================================
+// ansatz for a single 2D vortex to be multiplied with the
+// Thomas-Fermi density profile
+//===============================================================
+
+
+macro  addvortex(Th, Vh, xvor, yvor, epsvor,uvortex)
+{
+  /*  unitary unit li, Vh  are defined before*/
+     Vh rr =sqrt(x*x+y*y);
+
+  /* ansatz*/
+      
+      Vh qrad=sqrt((x-xvor)*(x-xvor)+(y-yvor)*(y-yvor));
+      Vh qder=0.5*(1.+tanh((qrad-epsvor)*4./epsvor)) ;
+
+      uvortex = (qrad>0)? sqrt(qder)*(x-xvor + li*(y-yvor))/qrad : 0. ;
+
+}// EOM

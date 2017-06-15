@@ -1,0 +1,50 @@
+//===============================================================
+// macro computing rho0
+// for the Thomas-Fermi approximation
+// quartic +/- quadratic potential
+//===============================================================
+
+
+macro  feta(eta) ( 4*a4*pow(eta,3)+3*a2o*pow(eta,2)-6./pi*vscale)// EOM
+macro dfeta(eta) (12*a4*pow(eta,2)+6*a2o*eta) //EOM
+
+/*include "../A_macros/Macro_IO_NEWTON.edp"; */
+include "../A_macro/Macro_IO_NEWTON_6th.edp";
+
+macro  computerhoQP2(rho0,Rout,Rin,a2,a4,ep,CN,Omop)
+{
+  /* takes into account the effective potential*/
+     real a2o = a2-Omop*Omop; 
+      
+  /* parameters*/
+      real vscale = ep*ep*CN;
+      real  Aeta  = 6./pi*vscale;
+      real   xi   = pow(abs(a2o),1.5)/sqrt(Aeta);
+  /* different cases */
+  if(  (a2o<0) && (a4<xi)) 
+      {
+       cout<<"TF computing rho0:: quartic-quadratic potential with hole"<<endl; 
+       rho0   = (pow(Aeta*a4*a4,(2./3.))-a2o*a2o)/(4.*a4);
+       Rin   = sqrt((-a2o-sqrt(a2o*a2o+4.*rho0*a4))/(2.*a4));
+      } 
+  else 
+      {
+       if(a2o >= 0)
+        cout<<"TF coputing rho0:: quartic-quadratic potential with depletion"<<endl; 
+       else
+        cout<<"TF coputing rho0:: quartic + quadratic"<<endl;
+ 
+        real reta ;
+        IONEWTON(feta,dfeta,0., 200.,1.e-6,reta);  
+        rho0 = a2o*reta+a4*reta*reta;
+        Rin=0;
+       }
+       
+       
+ Rout   = sqrt((-a2o+sqrt(a2o*a2o+4.*rho0*a4))/(2.*a4)); 
+ if(Rin == 0) Rin = 0.4*Rout;
+}// EOM
+
+
+
+

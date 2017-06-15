@@ -1,0 +1,31 @@
+//===============================================================
+//Macro to save a mesh with good precision
+//===============================================================
+macro mysavemesh(Th,namesh,prec)
+{
+        ofstream f(namesh);
+        f.precision(prec);
+        f << "MeshVersionFormatted 2" << endl;
+        f << endl << endl;
+        f << "Dimension 3" << endl;
+        f << endl << endl;
+        f << "Vertices" << endl;
+        f << Th.nv << endl;
+        for (int i = 0;i < Th.nv ;i++)
+                f << Th(i).x << " " << Th(i).y << " " << Th(i).z << " " << Th(i).label << endl;
+        f << endl << endl;
+        f << "Triangles" << endl;
+        f << Th.nbe << endl;
+        for (int i = 0; i < Th.nbe;i++)
+                f << Th(Th.be(i)[0])+1 << " " << Th(Th.be(i)[1])+1 << " " << Th(Th.be(i)[2])+1 << " " << Th.be(i).label << endl;
+        f << endl << endl;
+        f << "Tetrahedra" << endl;
+        f << Th.nt << endl;
+        for (int i = 0;i<Th.nt; i++)
+        f << Th(Th[i][0])+1 << " " << Th(Th[i][1])+1 << " " << Th(Th[i][2])+1 << " " << Th(Th[i][3])+1 << " " << Th[i].label << endl;
+        f << endl << endl;
+        f << "Corners" << endl;
+        f << "0" << endl;
+        f << endl << endl;
+        f << "End" << endl;
+}//

@@ -1,0 +1,56 @@
+/*  valid for 1D (dy derivatives are removed)
+two-component case
+*/
+
+macro  Newtonfixmu1d2comp(iter,EPS0,ITERMAX,ipass)
+{
+iter=0; 
+epsiter=10;
+
+ Vhvec [aN,bN,cN,dN],[v1n,v2n,v3n,v4n];
+
+ problem  aNewton([aN,bN,cN,dN],[v1n,v2n,v3n,v4n], solver=UMFPACK)=
+                     int2d(Th)(0.5*(dx(aN)*dx(v1n) ) + (Ctrap+ (beta11*(3*Psi1r^2 + Psi1i^2) + beta12*(Psi2r^2 + Psi2i^2)) - mu1)*aN*v1n)
+                    +int2d(Th)(0.5*(dx(bN)*dx(v2n) ) + (Ctrap+ (beta11*(Psi1r^2 + 3*Psi1i^2) + beta12*(Psi2r^2 + Psi2i^2)) - mu1)*bN*v2n)
+                    +int2d(Th)(0.5*(dx(cN)*dx(v3n) ) + (Ctrap+ (beta22*(3*Psi2r^2 + Psi2i^2) + beta21*(Psi1r^2 + Psi1i^2)) - mu2)*cN*v3n)
+                    +int2d(Th)(0.5*(dx(dN)*dx(v4n) ) + (Ctrap+ (beta22*(Psi2r^2 + 3*Psi2i^2) + beta21*(Psi1r^2 + Psi1i^2)) - mu2)*dN*v4n)   
+                    +int2d(Th)(2*beta11*Psi1r*Psi1i*bN*v1n + 2*beta12*Psi1r*(Psi2r*cN+Psi2i*dN)*v1n
+			      +2*beta11*Psi1r*Psi1i*aN*v2n + 2*beta12*Psi1i*(Psi2r*cN+Psi2i*dN)*v2n
+		              +2*beta22*Psi2r*Psi2i*dN*v3n + 2*beta21*Psi2r*(Psi1r*aN+Psi1i*bN)*v3n
+			      +2*beta22*Psi2r*Psi2i*cN*v4n + 2*beta21*Psi2i*(Psi1r*aN+Psi1i*bN)*v4n	       
+			       )
+                    -int2d(Th,qforder=qforder)(0.5*(dx(Psi1r)*dx(v1n) )
+					      +(Ctrap+ (beta11*(Psi1r^2 + Psi1i^2) + beta12*(Psi2r^2 + Psi2i^2)) - mu1)*Psi1r*v1n)
+                    -int2d(Th,qforder=qforder)(0.5*(dx(Psi1i)*dx(v2n) )
+			                      +(Ctrap+ (beta11*(Psi1r^2 + Psi1i^2) + beta12*(Psi2r^2 + Psi2i^2)) - mu1)*Psi1i*v2n)
+                    -int2d(Th,qforder=qforder)(0.5*(dx(Psi2r)*dx(v3n) )
+					      +(Ctrap+ (beta22*(Psi2r^2 + Psi2i^2) + beta21*(Psi1r^2 + Psi1i^2)) - mu2)*Psi2r*v3n)
+                    -int2d(Th,qforder=qforder)(0.5*(dx(Psi2i)*dx(v4n) )
+					       +(Ctrap+ (beta22*(Psi2r^2 + Psi2i^2) + beta21*(Psi1r^2 + Psi1i^2)) - mu2)*Psi2i*v4n)
+                    + on(2,4,aN=0) +  on(2,4,bN=0) +  on(2,4,cN=0) +  on(2,4,dN=0);  /*compatibility for 1D and 2D */
+
+                   
+  while(epsiter > EPS0 && iter < ITERMAX)
+ {
+  
+  iter++; 
+
+      aNewton;
+           
+      Psi1r = Psi1r - aN;
+      Psi1i = Psi1i - bN;
+      Psi2r = Psi2r - cN;
+      Psi2i = Psi2i - dN;    
+
+
+      epsiter= aN[].linfty;
+	    
+	  
+     cout << "Newton iter="<<iter<<" epsiter = " << epsiter <<endl;
+     fout << "Newton iter="<<iter<<" epsiter = " << epsiter <<endl;
+
+                                                      
+ } /* end Newton loop*/
+
+}
+//EOM
